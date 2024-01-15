@@ -119,10 +119,13 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
     st.write(resumen_intervencion_total_df)
     return df_filtrado
 
+def run():
+    # Cargar y procesar los datos
+    df_proyectos = load_data(sheet_url_proyectos)
+    df_operaciones = load_data(sheet_url_operaciones)
+    df_operaciones_desembolsos = load_data(sheet_url_desembolsos)
 
-df_proyectos = load_data(sheet_url_proyectos)
-df_operaciones = load_data(sheet_url_operaciones)
-df_operaciones_desembolsos = load_data(sheet_url_desembolsos)
+    processed_data = process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos)
 
-processed_data = process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos)
-
+if __name__ == "__main__":
+    run()
