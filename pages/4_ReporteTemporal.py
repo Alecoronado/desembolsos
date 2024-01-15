@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import threading
 import io
-import matplotlib.pyplot as plt
 
 def dataframe_to_excel_bytes(df):
     output = io.BytesIO()
