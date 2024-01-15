@@ -119,11 +119,12 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
     # Filtro por sector
     df_filtrado = df_filtrado if Sector_seleccionado == 'Todos' else df_filtrado[df_filtrado['IDAreaPrioritaria'] == Sector_seleccionado]
 
-
     resumen_df = df_filtrado.groupby('IDAreaPrioritaria').agg(
         Proyectos=('IDEtapa', 'nunique'),
         Suma_Monto=('Monto', 'sum')
     ).reset_index()
+
+    st.write("Tabla de Resumen de Sectores")
 
     total_proyectos = resumen_df['Proyectos'].sum()
     total_suma_monto = resumen_df['Suma_Monto'].sum()
@@ -166,6 +167,8 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
         Proyectos_Unicos=('IDEtapa', 'nunique'),
         Suma_Monto=('Monto', 'sum')
     ).reset_index()
+
+    st.write("Tabla de Resumen de SubSectores")
 
     total_proyectos_unicos = resumen_intervencion_total_df['Proyectos_Unicos'].sum()
     total_suma_monto_intervencion = resumen_intervencion_total_df['Suma_Monto'].sum()
