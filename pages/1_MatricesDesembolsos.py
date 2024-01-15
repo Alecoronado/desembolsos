@@ -38,9 +38,7 @@ def clean_and_convert_to_float(monto_str):
         return np.nan
 
 
-def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos, selected_countries):
-    if selected_countries:
-        df_operaciones = df_operaciones[df_operaciones['Pais'].isin(selected_countries)]
+def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
 
     # Aplicar la función de limpieza a la columna 'Monto'
     df_operaciones_desembolsos['Monto'] = df_operaciones_desembolsos['Monto'].apply(clean_and_convert_to_float)
@@ -65,6 +63,7 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos, selec
     merged_df['Porcentaje'] = ((merged_df['Monto'] / merged_df['AporteFONPLATAVigente']) * 100).round(2)
     merged_df['Monto'] = (merged_df['Monto']/1000).round(0)
     st.write(merged_df)
+
     return merged_df[merged_df['Ano'] >= 0]
 
 def create_pivot_table(filtered_df, value_column):
@@ -74,37 +73,49 @@ def create_pivot_table(filtered_df, value_column):
     
     return pivot_table
 
-df_proyectos = load_data(sheet_url_proyectos)
-df_operaciones = load_data(sheet_url_operaciones)
-df_operaciones_desembolsos = load_data(sheet_url_desembolsos)
+def run():
+    df_proyectos = load_data(sheet_url_proyectos)
+    df_operaciones = load_data(sheet_url_operaciones)
+    df_operaciones_desembolsos = load_data(sheet_url_desembolsos)
 
-unique_countries = df_operaciones['Pais'].unique().tolist()
-selected_countries = st.multiselect('Seleccione Países', unique_countries, default=unique_countries)
+    processed_data = process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos)
 
-processed_data = process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos, selected_countries)
+    # Agregar un filtro multiselect para los países con la opción "Todos"
+    paises_disponibles = processed_data['Pais'].unique()  # Obtiene una lista de todos los países únicos
+    paises_disponibles = np.insert(paises_disponibles, 0, "Todos")  # Agrega "Todos" al inicio de la lista
+    paises_seleccionados = st.multiselect('Seleccionar Países', paises_disponibles, default="Todos")
 
-pivot_table_monto = create_pivot_table(processed_data, 'Monto')
-st.write("Tabla Pivote de Monto de Desembolsos por Proyecto y Año")
-st.dataframe(pivot_table_monto)
+    # Si se selecciona "Todos", se seleccionan todos los países
+    if "Todos" in paises_seleccionados:
+        filtered_data = processed_data
+    else:
+        filtered_data = processed_data[processed_data['Pais'].isin(paises_seleccionados)]
 
-# Convertir el DataFrame a bytes y agregar botón de descarga
-excel_bytes = dataframe_to_excel_bytes(pivot_table_monto)
-st.download_button(
-    label="Descargar DataFrame en Excel",
-    data=excel_bytes,
-    file_name="matriz_monto_desembolsos.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+    # Crear y mostrar la tabla pivote de Monto
+    pivot_table_monto = create_pivot_table(filtered_data, 'Monto')
+    st.write("Tabla Pivote de Monto de Desembolsos por Proyecto y Año")
+    st.dataframe(pivot_table_monto)
 
-pivot_table_porcentaje = create_pivot_table(processed_data, 'Porcentaje')
-st.write("Tabla Pivote de Porcentaje de Desembolsos por Proyecto y Año")
-st.dataframe(pivot_table_porcentaje)
+    # Convertir el DataFrame a bytes y agregar botón de descarga para ambas tablas
+    excel_bytes_monto = dataframe_to_excel_bytes(pivot_table_monto)
+    st.download_button(
+        label="Descargar DataFrame en Excel (Monto)",
+        data=excel_bytes_monto,
+        file_name="matriz_monto_desembolsos.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
-# Convertir el DataFrame a bytes y agregar botón de descarga
-excel_bytes = dataframe_to_excel_bytes(pivot_table_porcentaje)
-st.download_button(
-    label="Descargar DataFrame en Excel",
-    data=excel_bytes,
-    file_name="matriz_porcentaje_desembolsos.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+    # Crear y mostrar la tabla pivote de Porcentaje
+    pivot_table_porcentaje = create_pivot_table(filtered_data, 'Porcentaje')
+    st.write("Tabla Pivote de Porcentaje de Desembolsos por Proyecto y Año")
+    st.dataframe(pivot_table_porcentaje)
+
+    excel_bytes_porcentaje = dataframe_to_excel_bytes(pivot_table_porcentaje)
+    st.download_button(
+        label="Descargar DataFrame en Excel (Porcentaje)",
+        data=excel_bytes_porcentaje,
+        file_name="matriz_porcentaje_desembolsos.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+if __name__ == "__main__":
+    run()

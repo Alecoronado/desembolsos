@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import threading
 import io
+import matplotlib.pyplot as plt
+import altair as alt
 
 def dataframe_to_excel_bytes(df):
     output = io.BytesIO()
@@ -18,7 +20,7 @@ sheet_url_proyectos = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaR
 sheet_url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaRLyqnjwtsRvlBFFOnzhfarkFMoJ04chQbKZCBRZXh_2REE3cmsRC69GwsUK0PoOVv95xptX/pub?gid=1468153763&single=true&output=csv"
 sheet_url_desembolsos = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaRLyqnjwtsRvlBFFOnzhfarkFMoJ04chQbKZCBRZXh_2REE3cmsRC69GwsUK0PoOVv95xptX/pub?gid=1657640798&single=true&output=csv"
 
-st.title("Análisis de Desembolsos por Proyecto")
+st.title("Análisis de Desembolsos")
 
 def load_data(url):
     with _lock:
@@ -60,43 +62,65 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
     merged_df['Año'] = merged_df['FechaEfectiva'].dt.year
     merged_df['Mes'] = merged_df['FechaEfectiva'].dt.month
 
+    # Lista de nombres de meses con opción 'Todos los Meses'
     nombres_meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
     nombres_meses_con_todos = ['Todos los Meses'] + nombres_meses
 
-    año_seleccionado = st.selectbox(
-        'Selecciona un año', 
-        options=np.sort(merged_df['Año'].unique())
+    # Lista de países con opción 'Todos'
+    paises_unicos = list(np.sort(merged_df['Pais'].unique()))
+    paises_con_todos = ['Todos'] + paises_unicos
+
+    # Multiselect para elegir países
+    selected_countries = st.multiselect(
+        'Selecciona países:', 
+        options=paises_unicos,
+        default=paises_unicos
     )
 
-    df_filtrado_por_año = merged_df[merged_df['Año'] == año_seleccionado]
+    # Comprobar si el usuario seleccionó la opción 'Todos'
+    if 'Todos' in selected_countries:
+        selected_countries = paises_unicos
 
+    # Lógica de filtrado en función de los países seleccionados
+    df_filtrado = merged_df[merged_df['Pais'].isin(selected_countries)]
+
+    # Obtener años únicos del DataFrame
+    años_unicos = list(np.sort(df_filtrado['Año'].unique()))
+
+    # Slider para elegir año
+    año_seleccionado = st.slider(
+        'Selecciona un año', 
+        min_value=min(años_unicos),
+        max_value=max(años_unicos),
+        value=min(años_unicos)  # Valor inicial del slider
+    )
+
+    # Filtro por año
+    df_filtrado = df_filtrado[df_filtrado['Año'] == año_seleccionado]
+    # Select box para elegir mes
     mes_seleccionado = st.selectbox(
-    'Selecciona un mes', 
-    options=nombres_meses_con_todos,
-    index=0
-)
+        'Selecciona un mes', 
+        options=nombres_meses_con_todos,
+        index=0
+    )
 
-    if año_seleccionado != 'Todos los Años':
-        df_filtrado = merged_df[merged_df['Año'] == año_seleccionado]
-    else:
-        df_filtrado = merged_df
-
+    # Filtro por mes
     if mes_seleccionado != 'Todos los Meses':
         mes_numero = nombres_meses.index(mes_seleccionado) + 1
         df_filtrado = df_filtrado[df_filtrado['Mes'] == mes_numero]
 
+    # Select box para elegir sector
     Sector_seleccionado = st.selectbox(
-    'Selecciona un Sector', 
-    options=['Todos'] + list(np.sort(merged_df['IDAreaPrioritaria'].unique()))
-)
+        'Selecciona un Sector', 
+        options=['Todos'] + list(np.sort(df_filtrado['IDAreaPrioritaria'].unique())),
+        index=0
+    )
 
-    # Filtrar DataFrame por el sector seleccionado, a menos que se seleccione 'Todos'
-    if Sector_seleccionado != 'Todos':
-        df_filtrado_sector = df_filtrado[df_filtrado['IDAreaPrioritaria'] == Sector_seleccionado]
-    else:
-        df_filtrado_sector = df_filtrado  
+    # Filtro por sector
+    df_filtrado = df_filtrado if Sector_seleccionado == 'Todos' else df_filtrado[df_filtrado['IDAreaPrioritaria'] == Sector_seleccionado]
 
-    resumen_df = df_filtrado_sector.groupby('IDAreaPrioritaria').agg(
+
+    resumen_df = df_filtrado.groupby('IDAreaPrioritaria').agg(
         Proyectos=('IDEtapa', 'nunique'),
         Suma_Monto=('Monto', 'sum')
     ).reset_index()
@@ -106,8 +130,39 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
     total_resumen_df = pd.DataFrame({'IDAreaPrioritaria': ['Total'], 'Proyectos': [total_proyectos], 'Suma_Monto': [total_suma_monto]})
     resumen_df = pd.concat([resumen_df, total_resumen_df], ignore_index=True)
     st.write(resumen_df)
+
+    excel_bytes_porcentaje = dataframe_to_excel_bytes(resumen_df)
+    st.download_button(
+        label="Descargar Tabla de Datos Filtrados por Sector",
+        data=excel_bytes_porcentaje,
+        file_name="AnálisisdeDesembolsosSector.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    # Creando el gráfico circular con mejoras
+    df_pie = resumen_df[resumen_df['IDAreaPrioritaria'] != 'Total']
+    fig, ax = plt.subplots()
+
+    # Crear el gráfico de pastel y mostrar porcentajes
+    pie, _, autopcts = ax.pie(
+        df_pie['Suma_Monto'], 
+        labels=df_pie['IDAreaPrioritaria'], 
+        autopct='%1.1f%%',  # Formato de porcentaje con un decimal
+        startangle=140,
+        colors=plt.cm.Paired.colors
+    )
+
+    # Añadir un círculo en el centro para un diseño de donut
+    centre_circle = plt.Circle((0,0),0.70,fc='white')
+    fig.gca().add_artist(centre_circle)
+
+    # Establecer un título para el gráfico
+    ax.set_title('Distribución de Montos por Sector en Porcentajes', fontsize=14)
+
+    # Mostrar el gráfico en Streamlit
+    st.pyplot(fig)
     
-    resumen_intervencion_total_df = df_filtrado_sector.groupby('IDAreaIntervencion').agg(
+    resumen_intervencion_total_df = df_filtrado.groupby('IDAreaIntervencion').agg(
         Proyectos_Unicos=('IDEtapa', 'nunique'),
         Suma_Monto=('Monto', 'sum')
     ).reset_index()
@@ -117,6 +172,45 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
     total_resumen_intervencion_df = pd.DataFrame({'IDAreaIntervencion': ['Total'], 'Proyectos_Unicos': [total_proyectos_unicos], 'Suma_Monto': [total_suma_monto_intervencion]})
     resumen_intervencion_total_df = pd.concat([resumen_intervencion_total_df, total_resumen_intervencion_df], ignore_index=True)
     st.write(resumen_intervencion_total_df)
+
+    excel_bytes_porcentaje = dataframe_to_excel_bytes(resumen_intervencion_total_df)
+    st.download_button(
+        label="Descargar Tabla de Datos Filtrados",
+        data=excel_bytes_porcentaje,
+        file_name="AnálisisdeDesembolsosSubSector.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    # Asegúrate de que df_pies esté definido
+    df_pies = resumen_intervencion_total_df[resumen_intervencion_total_df['IDAreaIntervencion'] != 'Total']
+
+    # Ordenar los datos por 'Suma_Monto' de menor a mayor
+    df_pies = df_pies.sort_values(by='Suma_Monto')
+
+    # Crear el gráfico de barras
+    bar_chart = alt.Chart(df_pies).mark_bar().encode(
+        x=alt.X('IDAreaIntervencion', sort=None),  # Usar el orden del DataFrame
+        y='Suma_Monto',
+        color='IDAreaIntervencion',  # Colores distintos para cada IDAreaIntervencion
+        tooltip=['IDAreaIntervencion', 'Suma_Monto']
+    )
+
+    # Crear el gráfico de texto para las etiquetas
+    text_chart = bar_chart.mark_text(
+        align='center',
+        baseline='bottom',
+        dy=-5  # Ajustar la posición del texto por encima de las barras
+    ).encode(
+        text='Suma_Monto'
+    )
+
+    # Combinar ambos gráficos
+    final_chart = (bar_chart + text_chart).properties(
+        title='Distribución de Montos por SubSector'
+    )
+
+    # Mostrar el gráfico en Streamlit
+    st.altair_chart(final_chart, use_container_width=True)
     return df_filtrado
 
 def run():
