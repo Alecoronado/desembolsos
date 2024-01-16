@@ -54,25 +54,26 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
     filtered_df['Ano'] = filtered_df['Ano'].astype(int)
 
     # Selectbox para filtrar por IDAreaPrioritaria
-    unique_areas = filtered_df['IDAreaPrioritaria'].unique()
-    selected_area = st.selectbox('Select IDAreaPrioritaria to filter', unique_areas)
-    filtered_result_df = filtered_df[filtered_df['IDAreaPrioritaria'] == selected_area]
+    unique_areas = filtered_df['IDAreaIntervencion'].unique()
+    selected_area = st.selectbox('Select IDAreaIntervencion to filter', unique_areas)
+    filtered_result_df = filtered_df[filtered_df['IDAreaIntervencion'] == selected_area]
 
     # Realizar cálculos para result_df
-    result_df = filtered_result_df.groupby(['IDAreaPrioritaria', 'Ano'])['Monto'].sum().reset_index()
-    result_df['Monto Acumulado'] = result_df.groupby(['IDAreaPrioritaria'])['Monto'].cumsum().reset_index(drop=True)
-    result_df['Porcentaje del Monto'] = result_df.groupby(['IDAreaPrioritaria'])['Monto'].apply(lambda x: x / x.sum() * 100).reset_index(drop=True).round(2)
-    result_df['Porcentaje Acumulado'] = result_df.groupby(['IDAreaPrioritaria'])['Monto Acumulado'].apply(lambda x: x / x.max() * 100).reset_index(drop=True).round(2)
+    result_df = filtered_result_df.groupby(['IDAreaIntervencion', 'Ano'])['Monto'].sum().reset_index()
+    result_df['Monto Acumulado'] = result_df.groupby(['IDAreaIntervencion'])['Monto'].cumsum().reset_index(drop=True)
+    result_df['Porcentaje del Monto'] = result_df.groupby(['IDAreaIntervencion'])['Monto'].apply(lambda x: x / x.sum() * 100).reset_index(drop=True).round(2)
+    result_df['Porcentaje Acumulado'] = result_df.groupby(['IDAreaIntervencion'])['Monto Acumulado'].apply(lambda x: x / x.max() * 100).reset_index(drop=True).round(2)
 
     # Convertir 'Monto' y 'Monto Acumulado' a millones y redondear a 2 decimales
     result_df['Monto'] = (result_df['Monto'] / 1000000).round(2)
     result_df['Monto Acumulado'] = (result_df['Monto Acumulado'] / 1000000).round(2)
 
     # Realizar cálculos para result_df_ano_efectiva
-    result_df_ano_efectiva = filtered_result_df.groupby(['IDAreaPrioritaria', 'Ano_FechaEfectiva'])['Monto'].sum().reset_index()
-    result_df_ano_efectiva['Monto Acumulado'] = result_df_ano_efectiva.groupby(['IDAreaPrioritaria'])['Monto'].cumsum().reset_index(drop=True)
-    result_df_ano_efectiva['Porcentaje del Monto'] = result_df_ano_efectiva.groupby(['IDAreaPrioritaria'])['Monto'].apply(lambda x: x / x.sum() * 100).reset_index(drop=True)
-    result_df_ano_efectiva['Porcentaje Acumulado'] = result_df_ano_efectiva.groupby(['IDAreaPrioritaria'])['Monto Acumulado'].apply(lambda x: x / x.max() * 100).reset_index(drop=True)
+    result_df_ano_efectiva = filtered_result_df.groupby(['IDAreaIntervencion', 'Ano_FechaEfectiva'])['Monto'].sum().reset_index()
+    result_df_ano_efectiva['Monto Acumulado'] = result_df_ano_efectiva.groupby(['IDAreaIntervencion'])['Monto'].cumsum().reset_index(drop=True)
+    result_df_ano_efectiva['Porcentaje del Monto'] = result_df_ano_efectiva.groupby(['IDAreaIntervencion'])['Monto'].apply(lambda x: (x / x.sum() * 100).round(2)).reset_index(drop=True)
+    result_df_ano_efectiva['Porcentaje Acumulado'] = result_df_ano_efectiva.groupby(['IDAreaIntervencion'])['Monto Acumulado'].apply(lambda x: (x / x.max() * 100).round(2)).reset_index(drop=True)
+
     # Convertir 'Monto' y 'Monto Acumulado' a millones y redondear a 2 decimales para ambas tablas
     result_df['Monto'] = (result_df['Monto']).round(2)
     result_df['Monto Acumulado'] = (result_df['Monto Acumulado']).round(2)

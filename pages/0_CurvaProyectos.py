@@ -56,22 +56,27 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
     filtered_df['Ano'] = filtered_df['Ano'].astype(int)
     st.write(filtered_df)
 
+    
+
     # Crear diccionario para mapear IDEtapa a Alias
     etapa_to_alias = df_operaciones.set_index('IDEtapa')['Alias'].to_dict()
     filtered_df['IDEtapa'] = filtered_df['IDEtapa'].astype(str)
     filtered_df['IDEtapa_Alias'] = filtered_df['IDEtapa'].map(lambda x: f"{x} ({etapa_to_alias.get(x, '')})")
 
+    # Obtener valores únicos y ordenarlos alfabéticamente
+    unique_etapas_alias = sorted(filtered_df['IDEtapa_Alias'].unique())
+
     # Selectbox para filtrar por IDEtapa
-    unique_etapas_alias = filtered_df['IDEtapa_Alias'].unique()
     selected_etapa_alias = st.selectbox('Select IDEtapa to filter', unique_etapas_alias)
     selected_etapa = selected_etapa_alias.split(' ')[0]
     filtered_result_df = filtered_df[filtered_df['IDEtapa'] == selected_etapa]
 
+
     # Realizar cálculos
     result_df = filtered_result_df.groupby(['IDEtapa', 'Ano'])['Monto'].sum().reset_index()
-    result_df['Monto Acumulado'] = result_df.groupby(['IDEtapa'])['Monto'].cumsum().reset_index(drop=True)
-    result_df['Porcentaje del Monto'] = result_df.groupby(['IDEtapa'])['Monto'].apply(lambda x: x / x.sum() * 100).reset_index(drop=True)
-    result_df['Porcentaje Acumulado'] = result_df.groupby(['IDEtapa'])['Monto Acumulado'].apply(lambda x: x / x.max() * 100).reset_index(drop=True)
+    result_df['Monto Acumulado'] = result_df.groupby(['IDEtapa'])['Monto'].cumsum().round(2).reset_index(drop=True)
+    result_df['Porcentaje del Monto'] = result_df.groupby(['IDEtapa'])['Monto'].apply(lambda x: x / x.sum() * 100).round(2).reset_index(drop=True)
+    result_df['Porcentaje Acumulado'] = result_df.groupby(['IDEtapa'])['Monto Acumulado'].apply(lambda x: x / x.max() * 100).round(2).reset_index(drop=True)
 
     # Convertir 'Monto' y 'Monto Acumulado' a millones y redondear a 2 decimales
     result_df['Monto'] = (result_df['Monto'] / 1000000).round(2)
@@ -79,9 +84,9 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
     
     # Realizar cálculos para result_df_ano_efectiva
     result_df_ano_efectiva = filtered_result_df.groupby(['IDEtapa', 'Ano_FechaEfectiva'])['Monto'].sum().reset_index()
-    result_df_ano_efectiva['Monto Acumulado'] = result_df_ano_efectiva.groupby(['IDEtapa'])['Monto'].cumsum().reset_index(drop=True)
-    result_df_ano_efectiva['Porcentaje del Monto'] = result_df_ano_efectiva.groupby(['IDEtapa'])['Monto'].apply(lambda x: x / x.sum() * 100).reset_index(drop=True)
-    result_df_ano_efectiva['Porcentaje Acumulado'] = result_df_ano_efectiva.groupby(['IDEtapa'])['Monto Acumulado'].apply(lambda x: x / x.max() * 100).reset_index(drop=True)
+    result_df_ano_efectiva['Monto Acumulado'] = result_df_ano_efectiva.groupby(['IDEtapa'])['Monto'].cumsum().round(2).reset_index(drop=True)
+    result_df_ano_efectiva['Porcentaje del Monto'] = result_df_ano_efectiva.groupby(['IDEtapa'])['Monto'].apply(lambda x: x / x.sum() * 100).round(2).reset_index(drop=True)
+    result_df_ano_efectiva['Porcentaje Acumulado'] = result_df_ano_efectiva.groupby(['IDEtapa'])['Monto Acumulado'].apply(lambda x: x / x.max() * 100).round(2).reset_index(drop=True)
 
     # Convertir 'Monto' y 'Monto Acumulado' a millones y redondear a 2 decimales para ambas tablas
     result_df['Monto'] = (result_df['Monto']).round(2)
