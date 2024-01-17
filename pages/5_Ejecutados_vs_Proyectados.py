@@ -8,11 +8,11 @@ def load_data():
     url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=0&single=true&output=csv"
     url_proyecciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=299668301&single=true&output=csv"
 
-    data_operaciones = pd.read_csv(url_operaciones, parse_dates=['FechaEfectiva'], dayfirst=True)
+    data_operaciones = pd.read_csv(url_operaciones, parse_dates=['FechaEfectiva'])
     data_proyecciones = pd.read_csv(url_proyecciones, parse_dates=['Fecha'], dayfirst=True)
 
-    data_operaciones['Monto'] = pd.to_numeric(data_operaciones['Monto'], errors='coerce').fillna(0)
-    data_proyecciones['Monto'] = pd.to_numeric(data_proyecciones['Monto'], errors='coerce').fillna(0)
+    data_operaciones['Monto'] = pd.to_numeric(data_operaciones['Monto'], errors='coerce')
+    data_proyecciones['Monto'] = pd.to_numeric(data_proyecciones['Monto'], errors='coerce')
     data_operaciones['Ejecutados'] = data_operaciones['Monto']
     data_proyecciones['Proyectados'] = data_proyecciones['Monto']
 
@@ -35,8 +35,6 @@ def load_data():
     return merged_data
 
 
-
-# Función para obtener los datos transpuestos por mes para un año específico
 def get_monthly_data(data, year):
     data_year = data[data['Year'] == year]
 
@@ -44,13 +42,17 @@ def get_monthly_data(data, year):
     grouped_data = data_year.groupby('Month').agg({'Proyectados': 'sum', 'Ejecutados': 'sum'}).reset_index()
 
     # Reemplazar el número del mes con el nombre del mes en español
-    spanish_months = list(calendar.month_name)[1:]
+    spanish_months = [calendar.month_name[i].capitalize() for i in range(1, 13)]
     grouped_data['Month'] = grouped_data['Month'].apply(lambda x: spanish_months[x - 1])
 
-    # Transponer el DataFrame después de convertir los nombres de los meses a español
+    # Transponer el DataFrame para que los meses sean columnas y 'Proyectados' y 'Ejecutados' sean las filas
     transposed_data = grouped_data.set_index('Month').T
 
+    # Calcular los totales para cada fila
+    transposed_data['Totales'] = transposed_data.sum(axis=1)
+
     return transposed_data
+
 
 # Function to create and return an Altair line chart with value labels
 def create_line_chart_with_labels(data):
