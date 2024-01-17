@@ -79,22 +79,42 @@ def create_line_chart_with_labels(data):
 
 # Función principal de la aplicación Streamlit
 def main():
+    # Título de la aplicación
     st.title("Análisis de Desembolsos")
 
+    # Cargar datos
     data = load_data()
 
-    year = st.selectbox("Selecciona el año", options=[2024, 2025, 2026])
+    # Filtrar por IDOperacion antes de seleccionar el año
+    selected_project = st.selectbox("Selecciona proyecto", ["Todos"] + data['IDOperacion'].unique().tolist())
 
-    monthly_data = get_monthly_data(data, year)
+    if selected_project == "Todos":
+        filtered_data = data
+    else:
+        # Filtrar por IDOperacion
+        filtered_data = data[data['IDOperacion'] == selected_project]
+
+    # Obtener lista de años únicos basados en los datos filtrados
+    unique_years = filtered_data['Year'].unique().tolist()
+
+    # Seleccionar el año mediante un selectbox
+    year = st.selectbox("Selecciona el año", unique_years)
+
+    # Obtener datos mensuales para el año seleccionado
+    monthly_data = get_monthly_data(filtered_data, year)
 
     # Mostrar los datos en Streamlit
-    st.write(f"Desembolsos Mensuales para {year}:")
+    st.write(f"Desembolsos Mensuales para {year} - Proyecto seleccionado: {selected_project}")
     st.write(monthly_data)
 
-    # Create and display the Altair chart
+    # Crear y mostrar el gráfico Altair
     chart = create_line_chart_with_labels(monthly_data)
     st.altair_chart(chart, use_container_width=True)
 
 if __name__ == "__main__":
     main()
+
+
+
+
 
