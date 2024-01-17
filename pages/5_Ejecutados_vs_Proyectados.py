@@ -1,14 +1,15 @@
 import streamlit as st
 import pandas as pd
 import calendar
+import altair as alt
 
 # Función para cargar datos desde Google Sheets
 def load_data():
     url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=0&single=true&output=csv"
     url_proyecciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=299668301&single=true&output=csv"
 
-    data_operaciones = pd.read_csv(url_operaciones, parse_dates=['FechaEfectiva'])
-    data_proyecciones = pd.read_csv(url_proyecciones, parse_dates=['Fecha'])
+    data_operaciones = pd.read_csv(url_operaciones, parse_dates=['FechaEfectiva'], dayfirst=True)
+    data_proyecciones = pd.read_csv(url_proyecciones, parse_dates=['Fecha'], dayfirst=True)
 
     data_operaciones['Monto'] = pd.to_numeric(data_operaciones['Monto'], errors='coerce').fillna(0)
     data_proyecciones['Monto'] = pd.to_numeric(data_proyecciones['Monto'], errors='coerce').fillna(0)
@@ -25,6 +26,8 @@ def load_data():
 
     merged_data = pd.merge(grouped_operaciones, grouped_proyecciones, on=['IDOperacion', 'Year', 'Month'], how='outer').fillna(0)
     st.write(merged_data)
+    merged_data['Ejecutados']= (merged_data['Ejecutados']/1000000).round(3)
+    merged_data['Proyectados']= (merged_data['Proyectados']/1000000).round(3)
     return merged_data
 
 
@@ -43,6 +46,37 @@ def get_monthly_data(data, year):
 
     return transposed_data
 
+# Function to create and return an Altair line chart with value labels
+def create_line_chart_with_labels(data):
+    # Melt the DataFrame to long format
+    long_df = data.reset_index().melt('index', var_name='Month', value_name='Amount')
+
+    # Define the correct order for months
+    month_order = ["January", "February", "March", "April", "May", "June", 
+                   "July", "August", "September", "October", "November", "December"]
+
+    # Create a line chart
+    line = alt.Chart(long_df).mark_line(point=True).encode(
+        x=alt.X('Month:N', sort=month_order),
+        y=alt.Y('Amount:Q', title='Amount'),
+        color='index:N',
+        tooltip=['Month', 'Amount', 'index']
+    ).properties(
+        width=450,
+        height=500
+    )
+
+    # Add text labels for the data points
+    text = line.mark_text(
+        align='left',
+        baseline='middle',
+        dx=8,
+    ).encode(
+        text='Amount:Q'
+    )
+
+    return (line + text)
+
 # Función principal de la aplicación Streamlit
 def main():
     st.title("Análisis de Desembolsos")
@@ -56,6 +90,10 @@ def main():
     # Mostrar los datos en Streamlit
     st.write(f"Desembolsos Mensuales para {year}:")
     st.write(monthly_data)
+
+    # Create and display the Altair chart
+    chart = create_line_chart_with_labels(monthly_data)
+    st.altair_chart(chart, use_container_width=True)
 
 if __name__ == "__main__":
     main()

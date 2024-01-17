@@ -58,10 +58,10 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
     merged_df['Monto'] = (merged_df['Monto']/1000000).round(3)
     st.write(merged_df)
 
-    excel_bytes_porcentaje = dataframe_to_excel_bytes(merged_df)
+    excel_bytes_merged_df = dataframe_to_excel_bytes(merged_df)
     st.download_button(
         label="Descargar Tabla de Datos Filtrados",
-        data=excel_bytes_porcentaje,
+        data=excel_bytes_merged_df,
         file_name="AnálisisdeDesembolsosr.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
