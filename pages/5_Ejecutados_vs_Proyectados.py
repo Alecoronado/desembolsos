@@ -7,31 +7,46 @@ import altair as alt
 def load_data():
     url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=0&single=true&output=csv"
     url_proyecciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=81813189&single=true&output=csv"
+    url_proyecciones_iniciales = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=1798498183&single=true&output=csv"
 
     data_operaciones = pd.read_csv(url_operaciones, parse_dates=['FechaEfectiva'])
     data_proyecciones = pd.read_csv(url_proyecciones, parse_dates=['Fecha'], dayfirst=True)
+    data_proyecciones_iniciales = pd.read_csv(url_proyecciones_iniciales, parse_dates=['FechaProgramada'], dayfirst=True)
 
     data_operaciones['Monto'] = pd.to_numeric(data_operaciones['Monto'], errors='coerce')
     data_proyecciones['Monto'] = pd.to_numeric(data_proyecciones['Monto'], errors='coerce')
     data_operaciones['Ejecutados'] = data_operaciones['Monto']
     data_proyecciones['Proyectados'] = data_proyecciones['Monto']
+    data_proyecciones_iniciales['Monto'] = pd.to_numeric(data_proyecciones_iniciales['Monto'], errors='coerce')
+    data_proyecciones_iniciales['ProyeccionesIniciales'] = data_proyecciones_iniciales['Monto']
 
     data_operaciones['Year'] = data_operaciones['FechaEfectiva'].dt.year
     data_operaciones['Month'] = data_operaciones['FechaEfectiva'].dt.month
     data_proyecciones['Year'] = data_proyecciones['Fecha'].dt.year
     data_proyecciones['Month'] = data_proyecciones['Fecha'].dt.month
+    data_proyecciones_iniciales['Year'] = data_proyecciones_iniciales['FechaProgramada'].dt.year
+    data_proyecciones_iniciales['Month'] = data_proyecciones_iniciales['FechaProgramada'].dt.month
 
     # Agregar la columna 'Pais' basándonos en las dos primeras letras de 'IDOperacion'
     data_operaciones['Pais'] = data_operaciones['IDOperacion'].str[:2].map({'AR': 'ARGENTINA', 'BO': 'BOLIVIA', 'BR': 'BRASIL', 'PY': 'PARAGUAY', 'UR': 'URUGUAY'})
     data_proyecciones['Pais'] = data_proyecciones['IDOperacion'].str[:2].map({'AR': 'ARGENTINA', 'BO': 'BOLIVIA', 'BR': 'BRASIL', 'PY': 'PARAGUAY', 'UR': 'URUGUAY'})
+    data_proyecciones_iniciales['Pais'] = data_proyecciones_iniciales['IDOperacion'].str[:2].map({'AR': 'ARGENTINA', 'BO': 'BOLIVIA', 'BR': 'BRASIL', 'PY': 'PARAGUAY', 'UR': 'URUGUAY'})
 
     grouped_operaciones = data_operaciones.groupby(['Pais', 'IDOperacion', 'Year', 'Month']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Ejecutados'}).reset_index()
     grouped_proyecciones = data_proyecciones.groupby(['Pais', 'IDOperacion', 'Year', 'Month']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Proyectados'}).reset_index()
+    # Agrupa data_proyecciones_iniciales por los campos necesarios
+    grouped_proyecciones_iniciales = data_proyecciones_iniciales.groupby(['Pais', 'IDOperacion', 'Year', 'Month']).agg({'ProyeccionesIniciales': 'sum'}).reset_index()
 
-    merged_data = pd.merge(grouped_operaciones, grouped_proyecciones, on=['Pais', 'IDOperacion', 'Year', 'Month'], how='outer').fillna(0)
+    # Combina los tres conjuntos de datos: operaciones, proyecciones y proyecciones iniciales
+    merged_data = pd.merge(grouped_operaciones, grouped_proyecciones, on=['Pais', 'IDOperacion', 'Year', 'Month'], how='outer')
+    merged_data = pd.merge(merged_data, grouped_proyecciones_iniciales, on=['Pais', 'IDOperacion', 'Year', 'Month'], how='outer').fillna(0)
+
+    # Conversiones finales y ajustes de escala
+    merged_data['Ejecutados'] = (merged_data['Ejecutados'] / 1000000).round(2)
+    merged_data['Proyectados'] = (merged_data['Proyectados'] / 1000000).round(2)
+    merged_data['ProyeccionesIniciales'] = (merged_data['ProyeccionesIniciales'] / 1000000).round(2)
+
     st.write(merged_data)
-    merged_data['Ejecutados'] = (merged_data['Ejecutados'] / 1000000).round(3)
-    merged_data['Proyectados'] = (merged_data['Proyectados'] / 1000000).round(3)
     return merged_data
 
 
@@ -39,7 +54,7 @@ def get_monthly_data(data, year):
     data_year = data[data['Year'] == year]
 
     # Agrupar los datos por mes y sumar los montos
-    grouped_data = data_year.groupby('Month').agg({'Proyectados': 'sum', 'Ejecutados': 'sum'}).reset_index()
+    grouped_data = data_year.groupby('Month').agg({'Proyectados': 'sum', 'Ejecutados': 'sum', 'ProyeccionesIniciales': 'sum'}).reset_index()
 
     # Reemplazar el número del mes con el nombre del mes en español
     spanish_months = [calendar.month_name[i].capitalize() for i in range(1, 13)]
@@ -70,8 +85,8 @@ def create_line_chart_with_labels(data):
         color='index:N',
         tooltip=['Month', 'Amount', 'index']
     ).properties(
-        width=450,
-        height=500
+        width=600,
+        height=600
     )
 
 
@@ -79,7 +94,8 @@ def create_line_chart_with_labels(data):
     text = line.mark_text(
         align='left',
         baseline='middle',
-        dx=8,
+        dx=9,
+        dy= 9
     ).encode(
         text='Amount:Q'
     )
@@ -89,7 +105,7 @@ def create_line_chart_with_labels(data):
 # Función principal de la aplicación Streamlit
 def main():
     # Título de la aplicación
-    st.title("Análisis de Desembolsos")
+    st.title("Seguimiento de Pronóstico de Desembolsos Proyectados")
 
     # Cargar datos
     data = load_data()
@@ -106,11 +122,17 @@ def main():
         # Filtrar por países seleccionados
         filtered_data = data[data['Pais'].isin(selected_countries)]
 
-    # Obtener lista de años únicos basados en los datos filtrados
-    unique_years_filtered = filtered_data['Year'].unique().tolist()
+    # Convertir los valores de año a enteros y obtener la lista ordenada
+    unique_years_filtered = sorted(filtered_data['Year'].astype(int).unique())
 
-    # Seleccionar el año mediante un selectbox
-    year = st.selectbox("Selecciona el año", unique_years_filtered)
+    # Asegurarse de que haya años disponibles
+    if unique_years_filtered:
+        # Seleccionar el año mediante un slider
+        year = st.slider("Selecciona el año", min_value=unique_years_filtered[0], max_value=unique_years_filtered[-1], value=unique_years_filtered[0])
+    else:
+        st.error("No hay datos disponibles para mostrar basados en la selección de país.")
+        return # Finaliza la ejecución de la función si no hay años para mostrar
+
 
     # Filtrar por IDOperacion después de obtener los datos mensuales
     selected_project = st.selectbox("Selecciona proyecto", ["Todos"] + filtered_data['IDOperacion'].unique().tolist())
