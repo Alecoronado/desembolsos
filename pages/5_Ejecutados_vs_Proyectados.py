@@ -69,14 +69,17 @@ def get_monthly_data(data, year):
     return transposed_data
 
 
-# Function to create and return an Altair line chart with value labels
 def create_line_chart_with_labels(data):
+    # Eliminar la columna 'Totales' del DataFrame para evitar que se muestre en el gráfico
+    if 'Totales' in data.columns:
+        data = data.drop(columns=['Totales'])
+
     # Melt the DataFrame to long format
     long_df = data.reset_index().melt('index', var_name='Month', value_name='Amount')
 
     # Define the correct order for months in español
     month_order_es = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-                    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+                      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
     # Create a line chart
     line = alt.Chart(long_df).mark_line(point=True).encode(
@@ -86,16 +89,15 @@ def create_line_chart_with_labels(data):
         tooltip=['Month', 'Amount', 'index']
     ).properties(
         width=600,
-        height=600
+        height=500
     )
-
 
     # Add text labels for the data points
     text = line.mark_text(
         align='left',
         baseline='middle',
-        dx=9,
-        dy= 9
+        dx=12,
+        dy=12 
     ).encode(
         text='Amount:Q'
     )
