@@ -17,7 +17,7 @@ sheet_url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedhe
 sheet_url_desembolsos = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaRLyqnjwtsRvlBFFOnzhfarkFMoJ04chQbKZCBRZXh_2REE3cmsRC69GwsUK0PoOVv95xptX/pub?gid=1657640798&single=true&output=csv"
 
 # Inicializar la aplicación de Streamlit
-st.title("Análisis de Desembolsos por Proyecto")
+st.title("Análisis de Desembolsos por Sectores")
 
 # Función para cargar los datos desde las hojas de Google Sheets
 def load_data(url):
@@ -127,6 +127,14 @@ def run():
     # Mostrar la tabla "Tabla por Año"
     st.write("Tabla por Año:", result_df)
 
+    excel_bytes_monto = dataframe_to_excel_bytes(result_df_ano_efectiva)
+    st.download_button(
+        label="Descargar DataFrame en Excel (Años en Vigencia)",
+        data=excel_bytes_monto,
+        file_name="Desembolsos en Años Vigentes.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
     # Crear y mostrar gráficos para result_df
     chart_monto = line_chart_with_labels(result_df, 'Ano', 'Monto', 'Monto por Año en Millones', color_monto)
     chart_monto_acumulado = line_chart_with_labels(result_df, 'Ano', 'Monto Acumulado', 'Monto Acumulado por Año en Millones', color_acumulado)
@@ -138,6 +146,14 @@ def run():
     
   # Mostrar la tabla "Tabla por Año de Fecha Efectiva"
     st.write("Tabla por Año de Fecha Efectiva:", result_df_ano_efectiva)
+    # Convertir el DataFrame a bytes y agregar botón de descarga para ambas tablas
+    excel_bytes_monto = dataframe_to_excel_bytes(result_df_ano_efectiva)
+    st.download_button(
+        label="Descargar DataFrame en Excel (Año Efectivo)",
+        data=excel_bytes_monto,
+        file_name="Desembolsos en Año Efectivo.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
     # Crear y mostrar gráficos para result_df_ano_efectiva
     chart_monto_efectiva = line_chart_with_labels(result_df_ano_efectiva, 'Ano_FechaEfectiva', 'Monto', 'Monto por Año de Fecha Efectiva en Millones', color_monto)

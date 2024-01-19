@@ -17,7 +17,7 @@ sheet_url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedhe
 sheet_url_desembolsos = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaRLyqnjwtsRvlBFFOnzhfarkFMoJ04chQbKZCBRZXh_2REE3cmsRC69GwsUK0PoOVv95xptX/pub?gid=1657640798&single=true&output=csv"
 
 # Inicializar la aplicación de Streamlit
-st.title("Análisis de Desembolsos por Proyecto")
+st.title("Análisis de Desembolsos por SubSectores")
 
 # Función para cargar los datos desde las hojas de Google Sheets
 def load_data(url):

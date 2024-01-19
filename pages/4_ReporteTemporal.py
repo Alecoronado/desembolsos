@@ -20,7 +20,7 @@ sheet_url_proyectos = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaR
 sheet_url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaRLyqnjwtsRvlBFFOnzhfarkFMoJ04chQbKZCBRZXh_2REE3cmsRC69GwsUK0PoOVv95xptX/pub?gid=1468153763&single=true&output=csv"
 sheet_url_desembolsos = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaRLyqnjwtsRvlBFFOnzhfarkFMoJ04chQbKZCBRZXh_2REE3cmsRC69GwsUK0PoOVv95xptX/pub?gid=1657640798&single=true&output=csv"
 
-st.title("Análisis de Desembolsos")
+st.title("Reporte de Desembolsos")
 
 def load_data(url):
     with _lock:
