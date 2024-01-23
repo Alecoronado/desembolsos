@@ -4,6 +4,14 @@ import calendar
 import altair as alt
 import matplotlib.pyplot as plt
 import numpy as np
+import io
+
+def dataframe_to_excel_bytes(df):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='Sheet1')
+    excel_bytes = output.getvalue()
+    return excel_bytes
 
 # Función para cargar datos desde Google Sheets
 def load_data():
@@ -64,6 +72,14 @@ def load_data():
     merged_data['ProyeccionesIniciales'] = (merged_data['ProyeccionesIniciales'] / 1000000).round(2)
 
     st.write(merged_data)
+    # Convertir el DataFrame a bytes y agregar botón de descarga para ambas tablas
+    excel_bytes_monto = dataframe_to_excel_bytes(merged_data)
+    st.download_button(
+        label="Descargar DataFrame en Excel (Monto)",
+        data=excel_bytes_monto,
+        file_name="matriz_monto_desembolsos.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
     return merged_data
 
 
