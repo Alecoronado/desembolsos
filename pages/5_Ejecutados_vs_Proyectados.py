@@ -7,7 +7,7 @@ import numpy as np
 
 # Función para cargar datos desde Google Sheets
 def load_data():
-    url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=0&single=true&output=csv"
+    url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?output=csv"
     url_proyecciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=81813189&single=true&output=csv"
     url_proyecciones_iniciales = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=1798498183&single=true&output=csv"
 
@@ -34,14 +34,29 @@ def load_data():
     data_proyecciones['Pais'] = data_proyecciones['IDOperacion'].str[:2].map({'AR': 'ARGENTINA', 'BO': 'BOLIVIA', 'BR': 'BRASIL', 'PY': 'PARAGUAY', 'UR': 'URUGUAY'})
     data_proyecciones_iniciales['Pais'] = data_proyecciones_iniciales['IDOperacion'].str[:2].map({'AR': 'ARGENTINA', 'BO': 'BOLIVIA', 'BR': 'BRASIL', 'PY': 'PARAGUAY', 'UR': 'URUGUAY'})
 
-    grouped_operaciones = data_operaciones.groupby(['Pais', 'IDOperacion', 'Year', 'Month']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Ejecutados'}).reset_index()
-    grouped_proyecciones = data_proyecciones.groupby(['Pais', 'IDOperacion', 'Year', 'Month']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Proyectados'}).reset_index()
+    grouped_operaciones = data_operaciones.groupby(['Pais', 'IDOperacion','Responsable', 'Year', 'Month']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Ejecutados'}).reset_index()
+    grouped_proyecciones = data_proyecciones.groupby(['Pais', 'IDOperacion','Responsable','Year', 'Month']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Proyectados'}).reset_index()
     # Agrupa data_proyecciones_iniciales por los campos necesarios
-    grouped_proyecciones_iniciales = data_proyecciones_iniciales.groupby(['Pais', 'IDOperacion', 'Year', 'Month']).agg({'ProyeccionesIniciales': 'sum'}).reset_index()
+    grouped_proyecciones_iniciales = data_proyecciones_iniciales.groupby(['Pais', 'Responsable','IDOperacion', 'Year', 'Month']).agg({'ProyeccionesIniciales': 'sum'}).reset_index()
 
     # Combina los tres conjuntos de datos: operaciones, proyecciones y proyecciones iniciales
     merged_data = pd.merge(grouped_operaciones, grouped_proyecciones, on=['Pais', 'IDOperacion', 'Year', 'Month'], how='outer')
     merged_data = pd.merge(merged_data, grouped_proyecciones_iniciales, on=['Pais', 'IDOperacion', 'Year', 'Month'], how='outer').fillna(0)
+
+    # Función para elegir el valor de 'Responsable'
+    def elegir_responsable(row):
+        if pd.notna(row['Responsable_x']) and row['Responsable_x'] != 0:
+            return row['Responsable_x']
+        elif pd.notna(row['Responsable_y']) and row['Responsable_y'] != 0:
+            return row['Responsable_y']
+        else:
+            return row['Responsable']
+
+    # Aplica la función para combinar las columnas de 'Responsable'
+    merged_data['Responsable'] = merged_data.apply(elegir_responsable, axis=1)
+
+    # Elimina las columnas antiguas de 'Responsable'
+    merged_data = merged_data.drop(['Responsable_x', 'Responsable_y'], axis=1)
 
     # Conversiones finales y ajustes de escala
     merged_data['Ejecutados'] = (merged_data['Ejecutados'] / 1000000).round(2)
@@ -149,6 +164,56 @@ def create_comparison_bar_chart(filtered_data, year):
     # Mostrar el gráfico en Streamlit
     st.pyplot(fig)
 
+def create_responsible_comparison_chart(filtered_data, year):
+    # Filtrar los datos para el año seleccionado y que tengan valores
+    data_year = filtered_data[(filtered_data['Year'] == year) & ((filtered_data['Ejecutados'] > 0) | (filtered_data['Proyectados'] > 0))]
+
+    # Agrupar los datos por 'Responsable'
+    grouped_data = data_year.groupby('Responsable', as_index=False).agg({
+        'Ejecutados': lambda x: round(x.sum(), 1),
+        'Proyectados': lambda x: round(x.sum(), 1)
+    })
+
+    # Configurar las posiciones y ancho de las barras
+    bar_width = 0.5
+    index = np.arange(len(grouped_data['Responsable']))
+
+    # Iniciar la creación del gráfico
+    fig, ax = plt.subplots()
+
+    # Crear las barras para 'Ejecutados'
+    bars1 = ax.bar(index - bar_width/2, grouped_data['Ejecutados'], bar_width, label='Ejecutados',color='r')
+
+    # Crear las barras para 'Proyectados'
+    bars2 = ax.bar(index + bar_width/2, grouped_data['Proyectados'], bar_width, label='Proyectados', color='b')
+
+    # Añadir las etiquetas en las barras
+    for bars in [bars1, bars2]:
+        for bar in bars:
+            yval = bar.get_height()
+            if yval > 0:  # Solo añadir etiqueta si el valor es mayor a cero
+                ax.text(bar.get_x() + bar.get_width()/2, yval, round(yval, 1), va='bottom', ha='center', fontsize=6)
+
+    # Añadir las etiquetas y títulos
+    ax.set_xlabel('Responsable')
+    ax.set_ylabel('Monto')
+    ax.set_title('Ejecutados vs Proyectados por Responsable')
+    
+    # Ajustar las etiquetas del eje x para alinear con las barras
+    ax.set_xticks(index)
+    ax.set_xticklabels(grouped_data['Responsable'], rotation=45, ha='right', fontsize=8)  # Ajustar la alineación y el tamaño de la fuente
+
+    ax.legend()
+
+    # Ajuste final para asegurar que la disposición de las etiquetas sea legible
+    plt.subplots_adjust(bottom=0.35)  # Ajustar si es necesario para dar más espacio a las etiquetas
+    fig.tight_layout()
+
+    # Mostrar el gráfico en Streamlit
+    st.pyplot(fig)
+
+
+
 # Función principal de la aplicación Streamlit
 def main():
     # Título de la aplicación
@@ -202,6 +267,8 @@ def main():
     st.altair_chart(chart, use_container_width=True)
 
     create_comparison_bar_chart(filtered_data, year)
+
+    create_responsible_comparison_chart(filtered_data, year)
 
 if __name__ == "__main__":
     main()
