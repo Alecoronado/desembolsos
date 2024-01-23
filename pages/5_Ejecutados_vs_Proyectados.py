@@ -201,7 +201,7 @@ def create_responsible_comparison_chart(filtered_data, year):
     
     # Ajustar las etiquetas del eje x para alinear con las barras
     ax.set_xticks(index)
-    ax.set_xticklabels(grouped_data['Responsable'], rotation=45, ha='right', fontsize=8)  # Ajustar la alineación y el tamaño de la fuente
+    ax.set_xticklabels(grouped_data['Responsable'], rotation=45, ha='right', fontsize=6)  # Ajustar la alineación y el tamaño de la fuente
 
     ax.legend()
 
@@ -210,8 +210,7 @@ def create_responsible_comparison_chart(filtered_data, year):
     fig.tight_layout()
 
     # Mostrar el gráfico en Streamlit
-    st.pyplot(fig)
-
+    st.pyplot(fig) 
 
 
 # Función principal de la aplicación Streamlit
