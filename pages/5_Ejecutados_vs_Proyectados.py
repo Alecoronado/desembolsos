@@ -42,7 +42,7 @@ def load_data():
     data_proyecciones['Pais'] = data_proyecciones['IDOperacion'].str[:2].map({'AR': 'ARGENTINA', 'BO': 'BOLIVIA', 'BR': 'BRASIL', 'PY': 'PARAGUAY', 'UR': 'URUGUAY'})
     data_proyecciones_iniciales['Pais'] = data_proyecciones_iniciales['IDOperacion'].str[:2].map({'AR': 'ARGENTINA', 'BO': 'BOLIVIA', 'BR': 'BRASIL', 'PY': 'PARAGUAY', 'UR': 'URUGUAY'})
 
-    grouped_operaciones = data_operaciones.groupby(['Pais', 'IDOperacion','Responsable', 'Year', 'Month']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Ejecutados'}).reset_index()
+    grouped_operaciones = data_operaciones.groupby(['Pais','IDOperacion','Responsable', 'Year', 'Month']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Ejecutados'}).reset_index()
     grouped_proyecciones = data_proyecciones.groupby(['Pais', 'IDOperacion','Responsable','Year', 'Month']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Proyectados'}).reset_index()
     # Agrupa data_proyecciones_iniciales por los campos necesarios
     grouped_proyecciones_iniciales = data_proyecciones_iniciales.groupby(['Pais', 'Responsable','IDOperacion', 'Year', 'Month']).agg({'ProyeccionesIniciales': 'sum'}).reset_index()
@@ -276,6 +276,14 @@ def main():
     # Mostrar los datos en Streamlit
     st.write(f"Desembolsos Mensuales para {year} - País(es) seleccionado(s): {', '.join(selected_countries)} - Proyecto seleccionado: {selected_project}")
     st.write(monthly_data)
+    # Convertir el DataFrame a bytes y agregar botón de descarga para ambas tablas
+    excel_bytes_monto = dataframe_to_excel_bytes(monthly_data)
+    st.download_button(
+        label="Descargar DataFrame en Excel (Proyectado vs Ejecutado por Meses)",
+        data=excel_bytes_monto,
+        file_name="Proyectado vs Ejecutado por meses.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
     # Crear y mostrar el gráfico de líneas con etiquetas
     chart = create_line_chart_with_labels(monthly_data)
