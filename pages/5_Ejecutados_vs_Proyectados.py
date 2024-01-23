@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import calendar
 import altair as alt
+import matplotlib.pyplot as plt
+import numpy as np
 
 # Función para cargar datos desde Google Sheets
 def load_data():
@@ -68,7 +70,6 @@ def get_monthly_data(data, year):
 
     return transposed_data
 
-
 def create_line_chart_with_labels(data):
     # Eliminar la columna 'Totales' del DataFrame para evitar que se muestre en el gráfico
     if 'Totales' in data.columns:
@@ -103,6 +104,50 @@ def create_line_chart_with_labels(data):
     )
 
     return (line + text)
+
+
+def create_comparison_bar_chart(filtered_data, year):
+    # Filtrar los datos para el año seleccionado
+    data_year = filtered_data[filtered_data['Year'] == year]
+
+    # Agrupar los datos por 'Pais' y calcular la suma de 'Ejecutados' y 'Proyectados', redondeando a un decimal
+    grouped_data = data_year.groupby('Pais', as_index=False).agg({
+        'Ejecutados': lambda x: round(x.sum(), 2),
+        'Proyectados': lambda x: round(x.sum(), 2)
+    })
+
+    # Configurar las posiciones y ancho de las barras
+    bar_width = 0.4
+    index = np.arange(len(grouped_data['Pais']))
+
+    # Iniciar la creación del gráfico
+    fig, ax = plt.subplots()
+
+    # Crear las barras para 'Ejecutados'
+    bars1 = ax.bar(index - bar_width/2, grouped_data['Ejecutados'], bar_width, label='Ejecutados', color='r')
+
+    # Crear las barras para 'Proyectados'
+    bars2 = ax.bar(index + bar_width/2, grouped_data['Proyectados'], bar_width, label='Proyectados', color='b')
+
+    # Añadir las etiquetas de los datos en las barras
+    ax.bar_label(bars1, padding=3, fontsize=8, fmt='%.2f')  # Reducir el tamaño de la fuente aquí
+    ax.bar_label(bars2, padding=3, fontsize=8, fmt='%.2f')  # Reducir el tamaño de la fuente aquí
+
+    # Ajustar las etiquetas y títulos
+    ax.set_xlabel('País')
+    ax.set_ylabel('Monto (en millones)')
+    ax.set_title('Ejecutados y Proyectados por País')
+    ax.set_xticks(index)
+    ax.set_xticklabels(grouped_data['Pais'], rotation=45, fontsize=8)  # Reducir el tamaño de la fuente aquí
+    ax.set_yticklabels(ax.get_yticks(), fontsize=8)  # Reducir el tamaño de la fuente aquí
+    ax.legend()
+
+    # Ajuste final para asegurar que la disposición de las etiquetas sea legible
+    plt.subplots_adjust(bottom=0.15)  # Ajustar si es necesario
+    fig.tight_layout()
+
+    # Mostrar el gráfico en Streamlit
+    st.pyplot(fig)
 
 # Función principal de la aplicación Streamlit
 def main():
@@ -152,9 +197,11 @@ def main():
     st.write(f"Desembolsos Mensuales para {year} - País(es) seleccionado(s): {', '.join(selected_countries)} - Proyecto seleccionado: {selected_project}")
     st.write(monthly_data)
 
-    # Crear y mostrar el gráfico Altair
+    # Crear y mostrar el gráfico de líneas con etiquetas
     chart = create_line_chart_with_labels(monthly_data)
     st.altair_chart(chart, use_container_width=True)
+
+    create_comparison_bar_chart(filtered_data, year)
 
 if __name__ == "__main__":
     main()
