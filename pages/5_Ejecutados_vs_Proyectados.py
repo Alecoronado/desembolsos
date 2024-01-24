@@ -191,14 +191,15 @@ def create_responsible_comparison_chart(filtered_data, year):
     })
 
     # Configurar las posiciones y ancho de las barras
-    bar_width = 0.5
+    bar_width = 0.4  # Ancho de las barras
+    bar_space = 0.2  # Espacio entre grupos de barras
     index = np.arange(len(grouped_data['Responsable']))
 
     # Iniciar la creación del gráfico
     fig, ax = plt.subplots()
 
     # Crear las barras para 'Ejecutados'
-    bars1 = ax.bar(index - bar_width/2, grouped_data['Ejecutados'], bar_width, label='Ejecutados',color='r')
+    bars1 = ax.bar(index - bar_width/2, grouped_data['Ejecutados'], bar_width, label='Ejecutados', color='r')
 
     # Crear las barras para 'Proyectados'
     bars2 = ax.bar(index + bar_width/2, grouped_data['Proyectados'], bar_width, label='Proyectados', color='b')
@@ -208,8 +209,7 @@ def create_responsible_comparison_chart(filtered_data, year):
         for bar in bars:
             yval = bar.get_height()
             if yval > 0:  # Solo añadir etiqueta si el valor es mayor a cero
-                ax.text(bar.get_x() + bar.get_width()/2, yval, round(yval, 1), va='bottom', ha='center', fontsize=6)
-
+                ax.text(bar.get_x() + bar.get_width()/2, yval + 0.9, round(yval, 1), va='bottom', ha='center', fontsize=5)
     # Añadir las etiquetas y títulos
     ax.set_xlabel('Responsable')
     ax.set_ylabel('Monto')
@@ -217,16 +217,17 @@ def create_responsible_comparison_chart(filtered_data, year):
     
     # Ajustar las etiquetas del eje x para alinear con las barras
     ax.set_xticks(index)
-    ax.set_xticklabels(grouped_data['Responsable'], rotation=45, ha='right', fontsize=6)  # Ajustar la alineación y el tamaño de la fuente
+    # Aumentar la rotación a 90 grados y ajustar la alineación y el tamaño de la fuente
+    ax.set_xticklabels(grouped_data['Responsable'], rotation=90, ha='right', fontsize=6, rotation_mode='anchor')
 
     ax.legend()
 
     # Ajuste final para asegurar que la disposición de las etiquetas sea legible
-    plt.subplots_adjust(bottom=0.35)  # Ajustar si es necesario para dar más espacio a las etiquetas
+    plt.subplots_adjust(bottom=0.5)  # Ajustar el espacio en la parte inferior para dar más espacio a las etiquetas
     fig.tight_layout()
 
     # Mostrar el gráfico en Streamlit
-    st.pyplot(fig) 
+    st.pyplot(fig)
 
 
 # Función principal de la aplicación Streamlit
