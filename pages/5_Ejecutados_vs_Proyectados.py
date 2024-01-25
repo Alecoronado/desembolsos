@@ -23,6 +23,7 @@ def load_data():
     data_proyecciones = pd.read_csv(url_proyecciones, parse_dates=['Fecha'], dayfirst=True)
     data_proyecciones_iniciales = pd.read_csv(url_proyecciones_iniciales, parse_dates=['FechaProgramada'], dayfirst=True)
 
+    data_operaciones['FechaEfectiva'] = pd.to_datetime(data_operaciones['FechaEfectiva'], format='%d/%m/%Y', errors='coerce')
     data_operaciones['Monto'] = pd.to_numeric(data_operaciones['Monto'], errors='coerce')
     data_proyecciones['Monto'] = pd.to_numeric(data_proyecciones['Monto'], errors='coerce')
     data_operaciones['Ejecutados'] = data_operaciones['Monto']
@@ -91,7 +92,7 @@ def get_monthly_data(data, year):
 
     # Reemplazar el número del mes con el nombre del mes en español
     spanish_months = [calendar.month_name[i].capitalize() for i in range(1, 13)]
-    grouped_data['Month'] = grouped_data['Month'].apply(lambda x: spanish_months[x - 1])
+    grouped_data['Month'] = grouped_data['Month'].apply(lambda x: spanish_months[int(x) - 1])
 
     # Transponer el DataFrame para que los meses sean columnas y 'Proyectados' y 'Ejecutados' sean las filas
     transposed_data = grouped_data.set_index('Month').T
