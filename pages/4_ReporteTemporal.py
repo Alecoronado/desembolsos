@@ -20,7 +20,7 @@ sheet_url_proyectos = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaR
 sheet_url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaRLyqnjwtsRvlBFFOnzhfarkFMoJ04chQbKZCBRZXh_2REE3cmsRC69GwsUK0PoOVv95xptX/pub?gid=1468153763&single=true&output=csv"
 sheet_url_desembolsos = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaRLyqnjwtsRvlBFFOnzhfarkFMoJ04chQbKZCBRZXh_2REE3cmsRC69GwsUK0PoOVv95xptX/pub?gid=1657640798&single=true&output=csv"
 
-st.title("Reporte de Desembolsos")
+st.title(" Reporte de Desembolsos")
 
 def load_data(url):
     with _lock:
@@ -56,15 +56,7 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
     
     merged_df['Porcentaje'] = ((merged_df['Monto'] / merged_df['AporteFONPLATAVigente']) * 100).round(2)
     merged_df['Monto'] = (merged_df['Monto']/1000000).round(3)
-    st.write(merged_df)
-
-    excel_bytes_merged_df = dataframe_to_excel_bytes(merged_df)
-    st.download_button(
-        label="Descargar Tabla de Datos Filtrados",
-        data=excel_bytes_merged_df,
-        file_name="AnálisisdeDesembolsosr.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    
 
     merged_df['FechaEfectiva'] = pd.to_datetime(merged_df['FechaEfectiva'])
     merged_df['Año'] = merged_df['FechaEfectiva'].dt.year
@@ -127,10 +119,11 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
     # Filtro por sector
     df_filtrado = df_filtrado if Sector_seleccionado == 'Todos' else df_filtrado[df_filtrado['IDAreaPrioritaria'] == Sector_seleccionado]
 
-    resumen_df = df_filtrado.groupby('IDAreaPrioritaria').agg(
-        Proyectos=('IDEtapa', 'nunique'),
-        Suma_Monto=('Monto', 'sum')
+    resumen_df = df_filtrado.groupby(['IDAreaPrioritaria', 'AreaPrioritaria']).agg(
+    Proyectos=('IDEtapa', 'nunique'),
+    Suma_Monto=('Monto', 'sum')
     ).reset_index()
+
 
     st.write("Tabla de Resumen de Sectores")
 
@@ -171,10 +164,12 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
     # Mostrar el gráfico en Streamlit
     st.pyplot(fig)
     
-    resumen_intervencion_total_df = df_filtrado.groupby('IDAreaIntervencion').agg(
-        Proyectos_Unicos=('IDEtapa', 'nunique'),
-        Suma_Monto=('Monto', 'sum')
+    resumen_intervencion_total_df = df_filtrado.groupby(['IDAreaIntervencion', 'AreaIntervencion']).agg(
+    Proyectos_Unicos=('IDEtapa', 'nunique'),
+    Suma_Monto=('Monto', 'sum')
     ).reset_index()
+
+
 
     st.write("Tabla de Resumen de SubSectores")
 

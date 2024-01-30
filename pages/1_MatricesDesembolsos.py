@@ -60,6 +60,7 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
     merged_df['Monto'] = pd.to_numeric(merged_df['Monto'], errors='coerce')
     merged_df['AporteFONPLATAVigente'] = pd.to_numeric(merged_df['AporteFONPLATAVigente'], errors='coerce')
     
+    st.write(merged_df)
     merged_df['Porcentaje'] = ((merged_df['Monto'] / merged_df['AporteFONPLATAVigente']) * 100).round(2)
     merged_df['Monto'] = (merged_df['Monto']/1000).round(0)
     st.write(merged_df)

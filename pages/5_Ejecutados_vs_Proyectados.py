@@ -72,15 +72,6 @@ def load_data():
     merged_data['Proyectados'] = (merged_data['Proyectados'] / 1000000).round(2)
     merged_data['ProyeccionesIniciales'] = (merged_data['ProyeccionesIniciales'] / 1000000).round(2)
 
-    st.write(merged_data)
-    # Convertir el DataFrame a bytes y agregar botón de descarga para ambas tablas
-    excel_bytes_monto = dataframe_to_excel_bytes(merged_data)
-    st.download_button(
-        label="Descargar DataFrame en Excel (Proyectado vs Ejecutado",
-        data=excel_bytes_monto,
-        file_name="Proyectado vs Ejecutado.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
     return merged_data
 
 
