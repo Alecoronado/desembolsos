@@ -61,6 +61,17 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
     merged_df['AporteFONPLATAVigente'] = pd.to_numeric(merged_df['AporteFONPLATAVigente'], errors='coerce')
     
     st.write(merged_df)
+    # Convertir el DataFrame a bytes y agregar botón de descarga para ambas tablas
+    excel_bytes_monto = dataframe_to_excel_bytes(merged_df)
+    st.download_button(
+        label="Descargar DataFrame en Excel (Monto)",
+        data=excel_bytes_monto,
+        file_name="matriz_monto_desembolsos2.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
+
     merged_df['Porcentaje'] = ((merged_df['Monto'] / merged_df['AporteFONPLATAVigente']) * 100).round(2)
     merged_df['Monto'] = (merged_df['Monto']/1000).round(0)
     st.write(merged_df)
