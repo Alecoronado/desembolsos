@@ -24,7 +24,7 @@ def load_data():
     columns_to_convert = ['Ejecutados', 'Proyectados', 'ProyeccionesIniciales']
 
     for column in columns_to_convert:
-        data[column] = pd.to_numeric(data[column])
+        data[column] = pd.to_numeric(data[column], errors='coerce')
 
     merged_data = data
 
