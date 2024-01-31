@@ -15,13 +15,65 @@ def dataframe_to_excel_bytes(df):
 
 # Función para cargar datos desde Google Sheets
 def load_data():
-    url_data = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?output=csv"
+    url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?output=csv"
+    url_proyecciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=81813189&single=true&output=csv"
+    url_proyecciones_iniciales = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=1798498183&single=true&output=csv"
     
-    # Cargar datos desde Google Sheets
-    data = pd.read_csv(url_data)
+    
+    data_operaciones = pd.read_csv(url_operaciones, parse_dates=['FechaEfectiva'])
+    data_proyecciones = pd.read_csv(url_proyecciones, parse_dates=['Fecha'], dayfirst=True)
+    data_proyecciones_iniciales = pd.read_csv(url_proyecciones_iniciales, parse_dates=['FechaProgramada'], dayfirst=True)
 
-    merged_data = data
+    data_operaciones['FechaEfectiva'] = pd.to_datetime(data_operaciones['FechaEfectiva'], format='%d/%m/%Y', errors='coerce')
+    data_operaciones['Monto'] = pd.to_numeric(data_operaciones['Monto'], errors='coerce')
+    data_proyecciones['Monto'] = pd.to_numeric(data_proyecciones['Monto'], errors='coerce')
+    data_operaciones['Ejecutados'] = data_operaciones['Monto']
+    data_proyecciones['Proyectados'] = data_proyecciones['Monto']
+    data_proyecciones_iniciales['Monto'] = pd.to_numeric(data_proyecciones_iniciales['Monto'], errors='coerce')
+    data_proyecciones_iniciales['ProyeccionesIniciales'] = data_proyecciones_iniciales['Monto']
+
+    data_operaciones['Year'] = data_operaciones['FechaEfectiva'].dt.year
+    data_operaciones['Month'] = data_operaciones['FechaEfectiva'].dt.month
+    data_proyecciones['Year'] = data_proyecciones['Fecha'].dt.year
+    data_proyecciones['Month'] = data_proyecciones['Fecha'].dt.month
+    data_proyecciones_iniciales['Year'] = data_proyecciones_iniciales['FechaProgramada'].dt.year
+    data_proyecciones_iniciales['Month'] = data_proyecciones_iniciales['FechaProgramada'].dt.month
+
+    # Agregar la columna 'Pais' basándonos en las dos primeras letras de 'IDOperacion'
+    data_operaciones['Pais'] = data_operaciones['IDOperacion'].str[:2].map({'AR': 'ARGENTINA', 'BO': 'BOLIVIA', 'BR': 'BRASIL', 'PY': 'PARAGUAY', 'UR': 'URUGUAY'})
+    data_proyecciones['Pais'] = data_proyecciones['IDOperacion'].str[:2].map({'AR': 'ARGENTINA', 'BO': 'BOLIVIA', 'BR': 'BRASIL', 'PY': 'PARAGUAY', 'UR': 'URUGUAY'})
+    data_proyecciones_iniciales['Pais'] = data_proyecciones_iniciales['IDOperacion'].str[:2].map({'AR': 'ARGENTINA', 'BO': 'BOLIVIA', 'BR': 'BRASIL', 'PY': 'PARAGUAY', 'UR': 'URUGUAY'})
+
+    grouped_operaciones = data_operaciones.groupby(['Pais','IDOperacion','Responsable', 'Year', 'Month']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Ejecutados'}).reset_index()
+    grouped_proyecciones = data_proyecciones.groupby(['Pais', 'IDOperacion','Responsable','Year', 'Month']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Proyectados'}).reset_index()
+    # Agrupa data_proyecciones_iniciales por los campos necesarios
+    grouped_proyecciones_iniciales = data_proyecciones_iniciales.groupby(['Pais', 'Responsable','IDOperacion', 'Year', 'Month']).agg({'ProyeccionesIniciales': 'sum'}).reset_index()
+
+    # Combina los tres conjuntos de datos: operaciones, proyecciones y proyecciones iniciales
+    merged_data = pd.merge(grouped_operaciones, grouped_proyecciones, on=['Pais', 'IDOperacion', 'Year', 'Month'], how='outer')
+    merged_data = pd.merge(merged_data, grouped_proyecciones_iniciales, on=['Pais', 'IDOperacion', 'Year', 'Month'], how='outer').fillna(0)
     
+
+    # Función para elegir el valor de 'Responsable'
+    def elegir_responsable(row):
+        if pd.notna(row['Responsable_x']) and row['Responsable_x'] != 0:
+            return row['Responsable_x']
+        elif pd.notna(row['Responsable_y']) and row['Responsable_y'] != 0:
+            return row['Responsable_y']
+        else:
+            return row['Responsable']
+
+    # Aplica la función para combinar las columnas de 'Responsable'
+    merged_data['Responsable'] = merged_data.apply(elegir_responsable, axis=1)
+
+    # Elimina las columnas antiguas de 'Responsable'
+    merged_data = merged_data.drop(['Responsable_x', 'Responsable_y'], axis=1)
+
+    # Conversiones finales y ajustes de escala
+    merged_data['Ejecutados'] = (merged_data['Ejecutados'] / 1000000).round(2)
+    merged_data['Proyectados'] = (merged_data['Proyectados'] / 1000000).round(2)
+    merged_data['ProyeccionesIniciales'] = (merged_data['ProyeccionesIniciales'] / 1000000).round(2)
+
     return merged_data
 
 
