@@ -15,7 +15,7 @@ def dataframe_to_excel_bytes(df):
 
 # Función para cargar datos desde Google Sheets
 def load_data():
-    url_data = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=722127048&single=true&output=csv"
+    url_data = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?output=csv"
     
     # Cargar datos desde Google Sheets
     data = pd.read_csv(url_data)
@@ -24,7 +24,7 @@ def load_data():
     columns_to_convert = ['Ejecutados', 'Proyectados', 'ProyeccionesIniciales']
 
     for column in columns_to_convert:
-        data[column] = pd.to_numeric(data[column], errors='coerce')
+        data[column] = pd.to_numeric(data[column])
 
     merged_data = data
 
