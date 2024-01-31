@@ -15,64 +15,18 @@ def dataframe_to_excel_bytes(df):
 
 # Función para cargar datos desde Google Sheets
 def load_data():
-    url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?output=csv"
-    url_proyecciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=81813189&single=true&output=csv"
-    url_proyecciones_iniciales = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=1798498183&single=true&output=csv"
+    url_data = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=722127048&single=true&output=csv"
     
-    
-    data_operaciones = pd.read_csv(url_operaciones, parse_dates=['FechaEfectiva'])
-    data_proyecciones = pd.read_csv(url_proyecciones, parse_dates=['Fecha'], dayfirst=True)
-    data_proyecciones_iniciales = pd.read_csv(url_proyecciones_iniciales, parse_dates=['FechaProgramada'], dayfirst=True)
+    # Cargar datos desde Google Sheets
+    data = pd.read_csv(url_data)
 
-    data_operaciones['FechaEfectiva'] = pd.to_datetime(data_operaciones['FechaEfectiva'], format='%d/%m/%Y', errors='coerce')
-    data_operaciones['Monto'] = pd.to_numeric(data_operaciones['Monto'], errors='coerce')
-    data_proyecciones['Monto'] = pd.to_numeric(data_proyecciones['Monto'], errors='coerce')
-    data_operaciones['Ejecutados'] = data_operaciones['Monto']
-    data_proyecciones['Proyectados'] = data_proyecciones['Monto']
-    data_proyecciones_iniciales['Monto'] = pd.to_numeric(data_proyecciones_iniciales['Monto'], errors='coerce')
-    data_proyecciones_iniciales['ProyeccionesIniciales'] = data_proyecciones_iniciales['Monto']
+    # Convertir las columnas 'Ejecutados', 'Proyectados', 'Responsable' y 'ProyeccionesIniciales' a valores numéricos
+    columns_to_convert = ['Ejecutados', 'Proyectados', 'ProyeccionesIniciales']
 
-    data_operaciones['Year'] = data_operaciones['FechaEfectiva'].dt.year
-    data_operaciones['Month'] = data_operaciones['FechaEfectiva'].dt.month
-    data_proyecciones['Year'] = data_proyecciones['Fecha'].dt.year
-    data_proyecciones['Month'] = data_proyecciones['Fecha'].dt.month
-    data_proyecciones_iniciales['Year'] = data_proyecciones_iniciales['FechaProgramada'].dt.year
-    data_proyecciones_iniciales['Month'] = data_proyecciones_iniciales['FechaProgramada'].dt.month
+    for column in columns_to_convert:
+        data[column] = pd.to_numeric(data[column], errors='coerce')
 
-    # Agregar la columna 'Pais' basándonos en las dos primeras letras de 'IDOperacion'
-    data_operaciones['Pais'] = data_operaciones['IDOperacion'].str[:2].map({'AR': 'ARGENTINA', 'BO': 'BOLIVIA', 'BR': 'BRASIL', 'PY': 'PARAGUAY', 'UR': 'URUGUAY'})
-    data_proyecciones['Pais'] = data_proyecciones['IDOperacion'].str[:2].map({'AR': 'ARGENTINA', 'BO': 'BOLIVIA', 'BR': 'BRASIL', 'PY': 'PARAGUAY', 'UR': 'URUGUAY'})
-    data_proyecciones_iniciales['Pais'] = data_proyecciones_iniciales['IDOperacion'].str[:2].map({'AR': 'ARGENTINA', 'BO': 'BOLIVIA', 'BR': 'BRASIL', 'PY': 'PARAGUAY', 'UR': 'URUGUAY'})
-
-    grouped_operaciones = data_operaciones.groupby(['Pais','IDOperacion','Responsable', 'Year', 'Month']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Ejecutados'}).reset_index()
-    grouped_proyecciones = data_proyecciones.groupby(['Pais', 'IDOperacion','Responsable','Year', 'Month']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Proyectados'}).reset_index()
-    # Agrupa data_proyecciones_iniciales por los campos necesarios
-    grouped_proyecciones_iniciales = data_proyecciones_iniciales.groupby(['Pais', 'Responsable','IDOperacion', 'Year', 'Month']).agg({'ProyeccionesIniciales': 'sum'}).reset_index()
-
-    # Combina los tres conjuntos de datos: operaciones, proyecciones y proyecciones iniciales
-    merged_data = pd.merge(grouped_operaciones, grouped_proyecciones, on=['Pais', 'IDOperacion', 'Year', 'Month'], how='outer')
-    merged_data = pd.merge(merged_data, grouped_proyecciones_iniciales, on=['Pais', 'IDOperacion', 'Year', 'Month'], how='outer').fillna(0)
-    
-
-    # Función para elegir el valor de 'Responsable'
-    def elegir_responsable(row):
-        if pd.notna(row['Responsable_x']) and row['Responsable_x'] != 0:
-            return row['Responsable_x']
-        elif pd.notna(row['Responsable_y']) and row['Responsable_y'] != 0:
-            return row['Responsable_y']
-        else:
-            return row['Responsable']
-
-    # Aplica la función para combinar las columnas de 'Responsable'
-    merged_data['Responsable'] = merged_data.apply(elegir_responsable, axis=1)
-
-    # Elimina las columnas antiguas de 'Responsable'
-    merged_data = merged_data.drop(['Responsable_x', 'Responsable_y'], axis=1)
-
-    # Conversiones finales y ajustes de escala
-    merged_data['Ejecutados'] = (merged_data['Ejecutados'] / 1000000).round(2)
-    merged_data['Proyectados'] = (merged_data['Proyectados'] / 1000000).round(2)
-    merged_data['ProyeccionesIniciales'] = (merged_data['ProyeccionesIniciales'] / 1000000).round(2)
+    merged_data = data
 
     return merged_data
 
@@ -138,7 +92,7 @@ def create_comparison_bar_chart(filtered_data, year):
     # Agrupar los datos por 'Pais' y calcular la suma de 'Ejecutados' y 'Proyectados', redondeando a un decimal
     grouped_data = data_year.groupby('Pais', as_index=False).agg({
         'Ejecutados': lambda x: round(x.sum(), 2),
-        'Proyectados': lambda x: round(x.sum(), 2)
+        'ProyeccionesIniciales': lambda x: round(x.sum(), 2)
     })
 
     # Configurar las posiciones y ancho de las barras
@@ -152,7 +106,7 @@ def create_comparison_bar_chart(filtered_data, year):
     bars1 = ax.bar(index - bar_width/2, grouped_data['Ejecutados'], bar_width, label='Ejecutados', color='r')
 
     # Crear las barras para 'Proyectados'
-    bars2 = ax.bar(index + bar_width/2, grouped_data['Proyectados'], bar_width, label='Proyectados', color='b')
+    bars2 = ax.bar(index + bar_width/2, grouped_data['ProyeccionesIniciales'], bar_width, label='ProyeccionesIniciales', color='skyblue')
 
     # Añadir las etiquetas de los datos en las barras
     ax.bar_label(bars1, padding=3, fontsize=8, fmt='%.2f')  # Reducir el tamaño de la fuente aquí
@@ -176,12 +130,12 @@ def create_comparison_bar_chart(filtered_data, year):
 
 def create_responsible_comparison_chart(filtered_data, year):
     # Filtrar los datos para el año seleccionado y que tengan valores
-    data_year = filtered_data[(filtered_data['Year'] == year) & ((filtered_data['Ejecutados'] > 0) | (filtered_data['Proyectados'] > 0))]
+    data_year = filtered_data[(filtered_data['Year'] == year) & ((filtered_data['Ejecutados'] > 0) | (filtered_data['ProyeccionesIniciales'] > 0))]
 
     # Agrupar los datos por 'Responsable'
     grouped_data = data_year.groupby('Responsable', as_index=False).agg({
         'Ejecutados': lambda x: round(x.sum(), 1),
-        'Proyectados': lambda x: round(x.sum(), 1)
+        'ProyeccionesIniciales': lambda x: round(x.sum(), 1)
     })
 
     # Configurar las posiciones y ancho de las barras
@@ -196,7 +150,7 @@ def create_responsible_comparison_chart(filtered_data, year):
     bars1 = ax.bar(index - bar_width/2, grouped_data['Ejecutados'], bar_width, label='Ejecutados', color='r')
 
     # Crear las barras para 'Proyectados'
-    bars2 = ax.bar(index + bar_width/2, grouped_data['Proyectados'], bar_width, label='Proyectados', color='b')
+    bars2 = ax.bar(index + bar_width/2, grouped_data['ProyeccionesIniciales'], bar_width, label='ProyeccionesIniciales', color='skyblue')
 
     # Añadir las etiquetas en las barras
     for bars in [bars1, bars2]:
@@ -290,10 +244,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
