@@ -18,7 +18,8 @@ def load_data():
     url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?output=csv"
     url_proyecciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=81813189&single=true&output=csv"
     url_proyecciones_iniciales = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFmOu4IjdEt7gLuAqjJTMvcpelmTr_IsL1WRy238YgRPDGLxsW74iMVUhYM2YegUblAKbLemfMxpW8/pub?gid=1798498183&single=true&output=csv"
-
+    
+    
     data_operaciones = pd.read_csv(url_operaciones, parse_dates=['FechaEfectiva'])
     data_proyecciones = pd.read_csv(url_proyecciones, parse_dates=['Fecha'], dayfirst=True)
     data_proyecciones_iniciales = pd.read_csv(url_proyecciones_iniciales, parse_dates=['FechaProgramada'], dayfirst=True)
@@ -43,14 +44,15 @@ def load_data():
     data_proyecciones['Pais'] = data_proyecciones['IDOperacion'].str[:2].map({'AR': 'ARGENTINA', 'BO': 'BOLIVIA', 'BR': 'BRASIL', 'PY': 'PARAGUAY', 'UR': 'URUGUAY'})
     data_proyecciones_iniciales['Pais'] = data_proyecciones_iniciales['IDOperacion'].str[:2].map({'AR': 'ARGENTINA', 'BO': 'BOLIVIA', 'BR': 'BRASIL', 'PY': 'PARAGUAY', 'UR': 'URUGUAY'})
 
-    grouped_operaciones = data_operaciones.groupby(['Pais','IDOperacion','Responsable', 'Year', 'Month']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Ejecutados'}).reset_index()
-    grouped_proyecciones = data_proyecciones.groupby(['Pais', 'IDOperacion','Responsable','Year', 'Month']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Proyectados'}).reset_index()
+    grouped_operaciones = data_operaciones.groupby(['Pais','IDOperacion','Responsable', 'Year', 'Month','IDAreaPrioritaria']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Ejecutados'}).reset_index()
+    grouped_proyecciones = data_proyecciones.groupby(['Pais', 'IDOperacion','Responsable','Year', 'Month','IDAreaPrioritaria']).agg({'Monto': 'sum'}).rename(columns={'Monto': 'Proyectados'}).reset_index()
     # Agrupa data_proyecciones_iniciales por los campos necesarios
-    grouped_proyecciones_iniciales = data_proyecciones_iniciales.groupby(['Pais', 'Responsable','IDOperacion', 'Year', 'Month']).agg({'ProyeccionesIniciales': 'sum'}).reset_index()
+    grouped_proyecciones_iniciales = data_proyecciones_iniciales.groupby(['Pais', 'Responsable','IDOperacion', 'Year', 'Month','IDAreaPrioritaria']).agg({'ProyeccionesIniciales': 'sum'}).reset_index()
 
     # Combina los tres conjuntos de datos: operaciones, proyecciones y proyecciones iniciales
-    merged_data = pd.merge(grouped_operaciones, grouped_proyecciones, on=['Pais', 'IDOperacion', 'Year', 'Month'], how='outer')
-    merged_data = pd.merge(merged_data, grouped_proyecciones_iniciales, on=['Pais', 'IDOperacion', 'Year', 'Month'], how='outer').fillna(0)
+    merged_data = pd.merge(grouped_operaciones, grouped_proyecciones, on=['Pais', 'IDOperacion', 'Year', 'Month','IDAreaPrioritaria'], how='outer')
+    merged_data = pd.merge(merged_data, grouped_proyecciones_iniciales, on=['Pais', 'IDOperacion', 'Year', 'Month','IDAreaPrioritaria'], how='outer').fillna(0)
+    
 
     # Función para elegir el valor de 'Responsable'
     def elegir_responsable(row):
@@ -136,7 +138,7 @@ def create_comparison_bar_chart(filtered_data, year):
     # Agrupar los datos por 'Pais' y calcular la suma de 'Ejecutados' y 'Proyectados', redondeando a un decimal
     grouped_data = data_year.groupby('Pais', as_index=False).agg({
         'Ejecutados': lambda x: round(x.sum(), 2),
-        'Proyectados': lambda x: round(x.sum(), 2)
+        'ProyeccionesIniciales': lambda x: round(x.sum(), 2)
     })
 
     # Configurar las posiciones y ancho de las barras
@@ -150,7 +152,7 @@ def create_comparison_bar_chart(filtered_data, year):
     bars1 = ax.bar(index - bar_width/2, grouped_data['Ejecutados'], bar_width, label='Ejecutados', color='r')
 
     # Crear las barras para 'Proyectados'
-    bars2 = ax.bar(index + bar_width/2, grouped_data['Proyectados'], bar_width, label='Proyectados', color='b')
+    bars2 = ax.bar(index + bar_width/2, grouped_data['ProyeccionesIniciales'], bar_width, label='ProyeccionesIniciales', color='skyblue')
 
     # Añadir las etiquetas de los datos en las barras
     ax.bar_label(bars1, padding=3, fontsize=8, fmt='%.2f')  # Reducir el tamaño de la fuente aquí
@@ -174,12 +176,12 @@ def create_comparison_bar_chart(filtered_data, year):
 
 def create_responsible_comparison_chart(filtered_data, year):
     # Filtrar los datos para el año seleccionado y que tengan valores
-    data_year = filtered_data[(filtered_data['Year'] == year) & ((filtered_data['Ejecutados'] > 0) | (filtered_data['Proyectados'] > 0))]
+    data_year = filtered_data[(filtered_data['Year'] == year) & ((filtered_data['Ejecutados'] > 0) | (filtered_data['ProyeccionesIniciales'] > 0))]
 
     # Agrupar los datos por 'Responsable'
     grouped_data = data_year.groupby('Responsable', as_index=False).agg({
         'Ejecutados': lambda x: round(x.sum(), 1),
-        'Proyectados': lambda x: round(x.sum(), 1)
+        'ProyeccionesIniciales': lambda x: round(x.sum(), 1)
     })
 
     # Configurar las posiciones y ancho de las barras
@@ -194,7 +196,7 @@ def create_responsible_comparison_chart(filtered_data, year):
     bars1 = ax.bar(index - bar_width/2, grouped_data['Ejecutados'], bar_width, label='Ejecutados', color='r')
 
     # Crear las barras para 'Proyectados'
-    bars2 = ax.bar(index + bar_width/2, grouped_data['Proyectados'], bar_width, label='Proyectados', color='b')
+    bars2 = ax.bar(index + bar_width/2, grouped_data['ProyeccionesIniciales'], bar_width, label='ProyeccionesIniciales', color='skyblue')
 
     # Añadir las etiquetas en las barras
     for bars in [bars1, bars2]:
@@ -225,7 +227,7 @@ def create_responsible_comparison_chart(filtered_data, year):
 # Función principal de la aplicación Streamlit
 def main():
     # Título de la aplicación
-    st.title("Seguimiento de Pronóstico de Desembolsos Proyectados")
+    st.title("Seguimiento de Desembolsos Proyectados")
 
     # Cargar datos
     data = load_data()
