@@ -20,6 +20,8 @@ def load_data():
     # Cargar datos desde Google Sheets
     data = pd.read_csv(url_data)
 
+    merged_data = data
+    
     return merged_data
 
 
