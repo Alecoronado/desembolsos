@@ -20,14 +20,6 @@ def load_data():
     # Cargar datos desde Google Sheets
     data = pd.read_csv(url_data)
 
-    # Convertir las columnas 'Ejecutados', 'Proyectados', 'Responsable' y 'ProyeccionesIniciales' a valores numéricos
-    columns_to_convert = ['Ejecutados', 'Proyectados', 'ProyeccionesIniciales']
-
-    for column in columns_to_convert:
-        data[column] = pd.to_numeric(data[column], errors='coerce')
-
-    merged_data = data
-
     return merged_data
 
 
