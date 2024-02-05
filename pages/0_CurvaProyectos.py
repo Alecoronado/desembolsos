@@ -13,7 +13,7 @@ _lock = threading.Lock()
 
 # URLs de las hojas de Google Sheets
 sheet_url_proyectos = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaRLyqnjwtsRvlBFFOnzhfarkFMoJ04chQbKZCBRZXh_2REE3cmsRC69GwsUK0PoOVv95xptX/pub?gid=2084477941&single=true&output=csv"
-sheet_url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaRLyqnjwtsRvlBFFOnzhfarkFMoJ04chQbKZCBRZXh_2REE3cmsRC69GwsUK0PoOVv95xptX/pub?gid=1468153763&single=true&output=csv"
+sheet_url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTadFwCrS_aws658IA94yjGvX_u5oaLnZ8JTVfTZqpaLhI1szZEUbst3rR1rC-zfReRNpMFt93RK_YV/pub?gid=420865954&single=true&output=csv"
 sheet_url_desembolsos = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaRLyqnjwtsRvlBFFOnzhfarkFMoJ04chQbKZCBRZXh_2REE3cmsRC69GwsUK0PoOVv95xptX/pub?gid=1657640798&single=true&output=csv"
 
 # Inicializar la aplicación de Streamlit
@@ -52,6 +52,10 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
     merged_df['FechaVigencia'] = pd.to_datetime(merged_df['FechaVigencia'], dayfirst=True, errors='coerce')
     merged_df['Ano'] = ((merged_df['FechaEfectiva'] - merged_df['FechaVigencia']).dt.days / 365).fillna(-1)
     merged_df['Ano_FechaEfectiva'] = pd.to_datetime(merged_df['FechaEfectiva']).dt.year
+    # Convierte las columnas 'Monto' y 'AporteFONPLATAVigente' a numéricas
+    merged_df['Monto'] = pd.to_numeric(merged_df['Monto'], errors='coerce')
+    merged_df['AporteFONPLATAVigente'] = pd.to_numeric(merged_df['AporteFONPLATAVigente'], errors='coerce')
+    merged_df['Porcentaje'] = ((merged_df['Monto'] / merged_df['AporteFONPLATAVigente']) * 100).round(2)
     filtered_df = merged_df[merged_df['Ano'] >= 0]
     filtered_df['Ano'] = filtered_df['Ano'].astype(int)
     st.write(filtered_df)
@@ -74,20 +78,35 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
 
     # Realizar cálculos
     result_df = filtered_result_df.groupby(['IDEtapa', 'Ano'])['Monto'].sum().reset_index()
-    result_df['Monto Acumulado'] = result_df.groupby(['IDEtapa'])['Monto'].cumsum().round(2).reset_index(drop=True)
-    result_df['Porcentaje del Monto'] = result_df.groupby(['IDEtapa'])['Monto'].apply(lambda x: x / x.sum() * 100).round(2).reset_index(drop=True)
-    result_df['Porcentaje Acumulado'] = result_df.groupby(['IDEtapa'])['Monto Acumulado'].apply(lambda x: x / x.max() * 100).round(2).reset_index(drop=True)
+    result_df['Monto Acumulado'] = result_df.groupby('IDEtapa')['Monto'].cumsum().round(2).reset_index(drop=True)
+
+    # Sumar el Porcentaje por IDEtapa y Año
+    result_df = result_df.merge(
+        filtered_result_df.groupby(['IDEtapa', 'Ano'])['Porcentaje'].sum().reset_index(),
+        on=['IDEtapa', 'Ano'],
+        how='left'
+    )
+
+    # Calcular el Porcentaje Acumulado por IDEtapa
+    result_df['Porcentaje Acumulado'] = result_df.groupby('IDEtapa')['Porcentaje'].cumsum().round(2).reset_index(drop=True)
 
     # Convertir 'Monto' y 'Monto Acumulado' a millones y redondear a 2 decimales
     result_df['Monto'] = (result_df['Monto'] / 1000000).round(2)
     result_df['Monto Acumulado'] = (result_df['Monto Acumulado'] / 1000000).round(2)
     
-    # Realizar cálculos para result_df_ano_efectiva
+    # Realizar cálculos para el Año de Fecha Efectiva
     result_df_ano_efectiva = filtered_result_df.groupby(['IDEtapa', 'Ano_FechaEfectiva'])['Monto'].sum().reset_index()
-    result_df_ano_efectiva['Monto Acumulado'] = result_df_ano_efectiva.groupby(['IDEtapa'])['Monto'].cumsum().round(2).reset_index(drop=True)
-    result_df_ano_efectiva['Porcentaje del Monto'] = result_df_ano_efectiva.groupby(['IDEtapa'])['Monto'].apply(lambda x: x / x.sum() * 100).round(2).reset_index(drop=True)
-    result_df_ano_efectiva['Porcentaje Acumulado'] = result_df_ano_efectiva.groupby(['IDEtapa'])['Monto Acumulado'].apply(lambda x: x / x.max() * 100).round(2).reset_index(drop=True)
+    result_df_ano_efectiva['Monto Acumulado'] = result_df_ano_efectiva.groupby('IDEtapa')['Monto'].cumsum().round(2).reset_index(drop=True)
 
+    # Sumar el Porcentaje por IDEtapa y Año de Fecha Efectiva
+    result_df_ano_efectiva = result_df_ano_efectiva.merge(
+        filtered_result_df.groupby(['IDEtapa', 'Ano_FechaEfectiva'])['Porcentaje'].sum().reset_index(),
+        on=['IDEtapa', 'Ano_FechaEfectiva'],
+        how='left'
+    )
+
+    # Calcular el Porcentaje Acumulado por IDEtapa
+    result_df_ano_efectiva['Porcentaje Acumulado'] = result_df_ano_efectiva.groupby('IDEtapa')['Porcentaje'].cumsum().round(2).reset_index(drop=True)
     # Convertir 'Monto' y 'Monto Acumulado' a millones y redondear a 2 decimales para ambas tablas
     result_df['Monto'] = (result_df['Monto']).round(2)
     result_df['Monto Acumulado'] = (result_df['Monto Acumulado']).round(2)
