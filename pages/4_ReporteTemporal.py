@@ -119,6 +119,7 @@ def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
     # Filtro por sector
     df_filtrado = df_filtrado if Sector_seleccionado == 'Todos' else df_filtrado[df_filtrado['IDAreaPrioritaria'] == Sector_seleccionado]
 
+    st.write(df_filtrado)
     resumen_df = df_filtrado.groupby(['IDAreaPrioritaria', 'AreaPrioritaria']).agg(
     Proyectos=('IDEtapa', 'nunique'),
     Suma_Monto=('Monto', 'sum')
