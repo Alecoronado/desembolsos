@@ -29,7 +29,6 @@ def pagina_inicial():
             <li><strong>Curva de Sectores</strong>: Análisis de los Montos Desembolsados de los proyectos y su progreso en Años y por Sectores.</li>
             <li><strong>Curva de Paises</strong>: Análisis de los Montos Desembolsados de los proyectos y su progreso en Años y por Paises.</li> 
             <li><strong>Curva de Por Tipo de Prestamos</strong>: Análisis de los Montos Desembolsados de los proyectos y su progreso en Años y por Tipo de Prestamos.</li>      
-                 
         </ul>
     </div>
     """, unsafe_allow_html=True)
