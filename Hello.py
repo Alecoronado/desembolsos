@@ -26,24 +26,27 @@ def pagina_inicial():
         <p>Explora las distintas secciones de la aplicación para obtener una comprensión completa de los desembolsos:</p>
         <ul>
             <li><strong>Curva de Proyectos</strong>: Análisis detallado de los Montos Desembolsados de los proyectos y su progreso en Años.</li>
-            <li><strong>Matrices de Desembolsos</strong>: Explora las matrices detalladas de los Montos de los desembolsos y Porcentaje de los Desembolsos en los Años.</li>
             <li><strong>Curva de Sectores</strong>: Análisis de los Montos Desembolsados de los proyectos y su progreso en Años y por Sectores.</li>
-            <li><strong>Curva de Paises</strong>: Análisis de los Montos Desembolsados de los proyectos y su progreso en Años y por Paises.</li>      
+            <li><strong>Curva de Paises</strong>: Análisis de los Montos Desembolsados de los proyectos y su progreso en Años y por Paises.</li> 
+            <li><strong>Curva de Por Tipo de Prestamos</strong>: Análisis de los Montos Desembolsados de los proyectos y su progreso en Años y por Tipo de Prestamos.</li>      
+                 
         </ul>
     </div>
     """, unsafe_allow_html=True)
 
-    # Resumen ejecutivo o highlights con margen
+    # Resumen Ejecutivo con margen
     st.markdown("""
     <div style="margin-left: 4em;">
-        <h2 style='margin-bottom: 0;'>Resumen Ejecutivo 🌟</h2>
+        <h2 style='margin-bottom: 0;'>📌 Resumen Ejecutivo</h2>
         <ul>
-            <li><strong>Tendencia Anual</strong>: Observa cómo han evolucionado los desembolsos año tras año.</li>
-            <li><strong>Comparación por Paises</strong>: Analiza cómo se distribuyen los fondos entre diferentes paises.</li>
-            <li><strong>Desembolsos y sus Porcentajes</strong>: Mantente al día con los últimos desembolsos.</li>
+            <li><strong>📊 Análisis de Desembolsos Acumulados</strong>: Se estudia cómo se desembolsa a lo largo de los años las Operaciones.</li>
+            <li><strong>📈 Regresión Lineal y R²</strong>: Se aplica un modelo de regresión lineal para identificar la tendencia de desembolsos acumulados y evaluar su precisión con el coeficiente de determinación R².</li>
+            <li><strong>🌎 Comportamiento por Países</strong>: Se analiza la evolución de los desembolsos por país, sector, subsector, tipo de prestamo y su tendencia en el tiempo.</li>
+            <li><strong>🤖 Predicción de Desembolsos Futuros</strong>: Se utiliza un modelo de redes neuronales para proyectar la curva de desembolsos en función de las características del proyecto.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
+
 
     st.markdown("""
         <div style='text-align: center;'>

@@ -1,154 +1,83 @@
 import streamlit as st
 import pandas as pd
-import altair as alt
-import numpy as np
-import threading
-import io
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
 
-# Configuración inicial
-LOGGER = st.logger.get_logger(__name__)
-_lock = threading.Lock()
-
-# URLs de las hojas de Google Sheets
-sheet_url_proyectos = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaRLyqnjwtsRvlBFFOnzhfarkFMoJ04chQbKZCBRZXh_2REE3cmsRC69GwsUK0PoOVv95xptX/pub?gid=2084477941&single=true&output=csv"
-sheet_url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaRLyqnjwtsRvlBFFOnzhfarkFMoJ04chQbKZCBRZXh_2REE3cmsRC69GwsUK0PoOVv95xptX/pub?gid=1468153763&single=true&output=csv"
-sheet_url_desembolsos = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTadFwCrS_aws658IA94yjGvX_u5oaLnZ8JTVfTZqpaLhI1szZEUbst3rR1rC-zfReRNpMFt93RK_YV/pub?gid=0&single=true&output=csv"
-
-# Inicializar la aplicación de Streamlit
-st.title("Análisis de Desembolsos por SubSectores")
-
-# Función para cargar los datos desde las hojas de Google Sheets
-def load_data(url):
-    with _lock:
-        return pd.read_csv(url)
-
-# Función para convertir el monto a un número flotante
-def convert_to_float(monto_str):
+# 📌 Cargar los datos desde el archivo Excel
+def cargar_datos():
+    file_path = "Desembolsos_Acum_Max.xlsx"  # Asegúrate de que el archivo esté en la misma carpeta
     try:
-        monto_str = monto_str.replace('.', '').replace(',', '.')
-        return float(monto_str)
-    except ValueError:
-        return np.nan
+        df = pd.read_excel(file_path, sheet_name='Sheet1')
+        df = df[['SubSector', 'Categoria Desembolso', 'Años', 'Porcentaje Acumulado']].dropna()
+        return df
+    except FileNotFoundError:
+        st.error("❌ No se encontró `Desembolsos_Acum_Max.xlsx`. Verifica que esté en la carpeta correcta.")
+        return pd.DataFrame()
 
-def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
-    # Preparar los DataFrames seleccionando las columnas requeridas
-    df_proyectos = df_proyectos[['NoProyecto', 'IDAreaPrioritaria', 'IDAreaIntervencion']]
-    df_operaciones = df_operaciones[['NoProyecto','IDEtapa' ,'NoOperacion', 'Alias', 'Pais', 'FechaVigencia', 'Estado', 'AporteFONPLATAVigente']]
-    df_operaciones_desembolsos = df_operaciones_desembolsos[['IDDesembolso', 'IDOperacion', 'Monto', 'FechaEfectiva']]
+# 📌 Función para realizar la regresión y graficar resultados
+def realizar_regresion(df_filtro, subsector_seleccionado, categoria_seleccionada):
+    X = df_filtro[['Años']].values
+    y = df_filtro['Porcentaje Acumulado'].values
 
-    # Fusionar DataFrames utilizando 'NoProyecto'
-    merged_df = pd.merge(df_operaciones_desembolsos, df_operaciones, left_on='IDOperacion', right_on='IDEtapa', how='inner')
-    merged_df = pd.merge(merged_df, df_proyectos, on='NoProyecto', how='left')
+    if len(X) < 2:
+        st.warning("⚠ No hay suficientes datos para calcular la regresión.")
+        return
 
-    # Convertir 'Monto' a numérico
-    merged_df['Monto'] = merged_df['Monto'].apply(convert_to_float)
+    # 📌 Aplicar regresión lineal
+    modelo = LinearRegression()
+    modelo.fit(X, y)
+    y_pred = modelo.predict(X)
+    r2 = r2_score(y, y_pred)
 
-    # Convertir fechas y calcular años
-    merged_df['FechaEfectiva'] = pd.to_datetime(merged_df['FechaEfectiva'], dayfirst=True, errors='coerce')
-    merged_df['FechaVigencia'] = pd.to_datetime(merged_df['FechaVigencia'], dayfirst=True, errors='coerce')
-    merged_df['Ano'] = ((merged_df['FechaEfectiva'] - merged_df['FechaVigencia']).dt.days / 365).fillna(-1)
-    merged_df['Ano_FechaEfectiva'] = pd.to_datetime(merged_df['FechaEfectiva']).dt.year
-    filtered_df = merged_df[merged_df['Ano'] >= 0]
-    filtered_df['Ano'] = filtered_df['Ano'].astype(int)
+    # 📌 Mostrar el coeficiente R²
+    st.write(f"### 📌 Coeficiente de determinación R²: `{r2:.2f}`")
 
-    # Selectbox para filtrar por IDAreaPrioritaria
-    unique_areas = filtered_df['IDAreaIntervencion'].unique()
-    selected_area = st.selectbox('Select IDAreaIntervencion to filter', unique_areas)
-    filtered_result_df = filtered_df[filtered_df['IDAreaIntervencion'] == selected_area]
-
-    # Realizar cálculos para result_df
-    result_df = filtered_result_df.groupby(['IDAreaIntervencion', 'Ano'])['Monto'].sum().reset_index()
-    result_df['Monto Acumulado'] = result_df.groupby(['IDAreaIntervencion'])['Monto'].cumsum().reset_index(drop=True)
-    result_df['Porcentaje del Monto'] = result_df.groupby(['IDAreaIntervencion'])['Monto'].apply(lambda x: x / x.sum() * 100).reset_index(drop=True).round(2)
-    result_df['Porcentaje Acumulado'] = result_df.groupby(['IDAreaIntervencion'])['Monto Acumulado'].apply(lambda x: x / x.max() * 100).reset_index(drop=True).round(2)
-
-    # Convertir 'Monto' y 'Monto Acumulado' a millones y redondear a 2 decimales
-    result_df['Monto'] = (result_df['Monto'] / 1000000).round(2)
-    result_df['Monto Acumulado'] = (result_df['Monto Acumulado'] / 1000000).round(2)
-
-    # Realizar cálculos para result_df_ano_efectiva
-    result_df_ano_efectiva = filtered_result_df.groupby(['IDAreaIntervencion', 'Ano_FechaEfectiva'])['Monto'].sum().reset_index()
-    result_df_ano_efectiva['Monto Acumulado'] = result_df_ano_efectiva.groupby(['IDAreaIntervencion'])['Monto'].cumsum().reset_index(drop=True)
-    result_df_ano_efectiva['Porcentaje del Monto'] = result_df_ano_efectiva.groupby(['IDAreaIntervencion'])['Monto'].apply(lambda x: (x / x.sum() * 100).round(2)).reset_index(drop=True)
-    result_df_ano_efectiva['Porcentaje Acumulado'] = result_df_ano_efectiva.groupby(['IDAreaIntervencion'])['Monto Acumulado'].apply(lambda x: (x / x.max() * 100).round(2)).reset_index(drop=True)
-
-    # Convertir 'Monto' y 'Monto Acumulado' a millones y redondear a 2 decimales para ambas tablas
-    result_df['Monto'] = (result_df['Monto']).round(2)
-    result_df['Monto Acumulado'] = (result_df['Monto Acumulado']).round(2)
-    result_df_ano_efectiva['Monto'] = (result_df_ano_efectiva['Monto'] / 1000000).round(2)
-    result_df_ano_efectiva['Monto Acumulado'] = (result_df_ano_efectiva['Monto Acumulado'] / 1000000).round(2)
-
-    return result_df, result_df_ano_efectiva
-
-# Función para convertir DataFrame a Excel
-def dataframe_to_excel_bytes(df):
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, sheet_name='Resultados', index=False)
-    output.seek(0)
-    return output
-
-# Función para crear una gráfica de líneas con etiquetas
-def line_chart_with_labels(data, x_col, y_col, title, color):
-    chart = alt.Chart(data).mark_line(point=True, color=color).encode(
-        x=alt.X(f'{x_col}:O', axis=alt.Axis(title='Año', labelAngle=0)),
-        y=alt.Y(f'{y_col}:Q', axis=alt.Axis(title=y_col)),
-        tooltip=[x_col, y_col]
-    ).properties(
-        title=title,
-        width=600,
-        height=400
-    )
-    text = chart.mark_text(
-        align='left',
-        baseline='middle',
-        dx=18,
-        dy=-18
-    ).encode(
-        text=alt.Text(f'{y_col}:Q', format='.2f')
-    )
-    return chart + text
-
-#Funcion
-def run():
-    # Cargar y procesar los datos
-    df_proyectos = load_data(sheet_url_proyectos)
-    df_operaciones = load_data(sheet_url_operaciones)
-    df_operaciones_desembolsos = load_data(sheet_url_desembolsos)
-    result_df, result_df_ano_efectiva = process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos)
-
-    # Define los colores para cada gráfico
-    color_monto = 'steelblue'
-    color_acumulado = 'goldenrod'
-    color_porcentaje = 'salmon'
-
-    # Mostrar la tabla "Tabla por Año"
-    st.write("Tabla por Año:", result_df)
-
-    # Crear y mostrar gráficos para result_df
-    chart_monto = line_chart_with_labels(result_df, 'Ano', 'Monto', 'Monto por Año en Millones', color_monto)
-    chart_monto_acumulado = line_chart_with_labels(result_df, 'Ano', 'Monto Acumulado', 'Monto Acumulado por Año en Millones', color_acumulado)
-    chart_porcentaje_acumulado = line_chart_with_labels(result_df, 'Ano', 'Porcentaje Acumulado', 'Porcentaje Acumulado del Monto por Año', color_porcentaje)
-
-    st.altair_chart(chart_monto, use_container_width=True)
-    st.altair_chart(chart_monto_acumulado, use_container_width=True)
-    st.altair_chart(chart_porcentaje_acumulado, use_container_width=True)
+    # 📌 Crear gráfico en Matplotlib
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.scatter(X, y, color='blue', label="Datos Reales")
+    ax.plot(X, y_pred, color='red', linestyle="--", label="Regresión Lineal")
+    ax.set_xlabel("Años")
+    ax.set_ylabel("Porcentaje Acumulado")
+    ax.set_title(f"Regresión Lineal para {subsector_seleccionado} - {categoria_seleccionada}")
+    ax.legend()
     
-  # Mostrar la tabla "Tabla por Año de Fecha Efectiva"
-    st.write("Tabla por Año de Fecha Efectiva:", result_df_ano_efectiva)
+    # 📌 Mostrar gráfico
+    st.pyplot(fig)
 
-    # Crear y mostrar gráficos para result_df_ano_efectiva
-    chart_monto_efectiva = line_chart_with_labels(result_df_ano_efectiva, 'Ano_FechaEfectiva', 'Monto', 'Monto por Año de Fecha Efectiva en Millones', color_monto)
-    chart_monto_acumulado_efectiva = line_chart_with_labels(result_df_ano_efectiva, 'Ano_FechaEfectiva', 'Monto Acumulado', 'Monto Acumulado por Año de Fecha Efectiva en Millones', color_acumulado)
-    chart_porcentaje_acumulado_efectiva = line_chart_with_labels(result_df_ano_efectiva, 'Ano_FechaEfectiva', 'Porcentaje Acumulado', 'Porcentaje Acumulado del Monto por Año de Fecha Efectiva', color_porcentaje)
+# 📌 Función principal de la página
+def app():
+    st.title("📊 Análisis de Regresión: Porcentaje Acumulado por Años - SubSectores")
 
-    st.altair_chart(chart_monto_efectiva, use_container_width=True)
-    st.altair_chart(chart_monto_acumulado_efectiva, use_container_width=True)
-    st.altair_chart(chart_porcentaje_acumulado_efectiva, use_container_width=True)
+    # 📌 Cargar datos
+    df = cargar_datos()
+    if df.empty:
+        return
 
-    
+    # 📌 Selector de subsector dentro de la app
+    subsectores = sorted(df['SubSector'].unique())
+    subsector_seleccionado = st.selectbox("🏢 Selecciona un subsector:", subsectores)
 
+    # 📌 Filtrar categorías de desembolso según el subsector seleccionado
+    categorias_disponibles = df[df['SubSector'] == subsector_seleccionado]['Categoria Desembolso'].unique()
+
+    if len(categorias_disponibles) == 0:
+        st.warning(f"⚠ No hay categorías de desembolso disponibles para el subsector {subsector_seleccionado}.")
+        return
+
+    categoria_seleccionada = st.selectbox("📊 Selecciona una categoría de desembolso:", sorted(categorias_disponibles))
+
+    # 📌 Filtrar datos por subsector y categoría de desembolso
+    df_filtro = df[(df['SubSector'] == subsector_seleccionado) & (df['Categoria Desembolso'] == categoria_seleccionada)]
+
+    if df_filtro.empty:
+        st.warning(f"⚠ No hay datos disponibles para {subsector_seleccionado} - {categoria_seleccionada}.")
+        return
+
+    # 📌 Ejecutar la regresión y graficar resultados
+    realizar_regresion(df_filtro, subsector_seleccionado, categoria_seleccionada)
+
+# 📌 Ejecutar la app si se llama directamente
 if __name__ == "__main__":
-    run()
+    app()
+

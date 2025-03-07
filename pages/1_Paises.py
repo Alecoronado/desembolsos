@@ -9,14 +9,14 @@ def cargar_datos():
     file_path = "Desembolsos_Acum_Max.xlsx"  # Asegúrate de que el archivo esté en la misma carpeta
     try:
         df = pd.read_excel(file_path, sheet_name='Sheet1')
-        df = df[['Sector', 'Categoria Desembolso', 'Años', 'Porcentaje Acumulado']].dropna()
+        df = df[['Pais', 'Categoria Desembolso', 'Años', 'Porcentaje Acumulado']].dropna()
         return df
     except FileNotFoundError:
         st.error("❌ No se encontró `Desembolsos_Acum_Max.xlsx`. Verifica que esté en la carpeta correcta.")
         return pd.DataFrame()
 
 # 📌 Función para realizar la regresión y graficar resultados
-def realizar_regresion(df_filtro, sector_seleccionado, categoria_seleccionada):
+def realizar_regresion(df_filtro, pais_seleccionado, categoria_seleccionada):
     X = df_filtro[['Años']].values
     y = df_filtro['Porcentaje Acumulado'].values
 
@@ -39,7 +39,7 @@ def realizar_regresion(df_filtro, sector_seleccionado, categoria_seleccionada):
     ax.plot(X, y_pred, color='red', linestyle="--", label="Regresión Lineal")
     ax.set_xlabel("Años")
     ax.set_ylabel("Porcentaje Acumulado")
-    ax.set_title(f"Regresión Lineal para {sector_seleccionado} - {categoria_seleccionada}")
+    ax.set_title(f"Regresión Lineal para {pais_seleccionado} - {categoria_seleccionada}")
     ax.legend()
     
     # 📌 Mostrar gráfico
@@ -47,36 +47,38 @@ def realizar_regresion(df_filtro, sector_seleccionado, categoria_seleccionada):
 
 # 📌 Función principal de la página
 def app():
-    st.title("📊 Análisis de Regresión: Porcentaje Acumulado por Años - Sectores")
+    st.title("📊 Análisis de Regresión: Porcentaje Acumulado por Años")
 
     # 📌 Cargar datos
     df = cargar_datos()
     if df.empty:
         return
 
-    # 📌 Selector de sector dentro de la app
-    sectores = sorted(df['Sector'].unique())
-    sector_seleccionado = st.selectbox("🏭 Selecciona un sector:", sectores)
+    # 📌 Selector de país dentro de la app
+    paises = sorted(df['Pais'].unique())
+    pais_seleccionado = st.selectbox("🌍 Selecciona un país:", paises)
 
-    # 📌 Filtrar categorías de desembolso según el sector seleccionado
-    categorias_disponibles = df[df['Sector'] == sector_seleccionado]['Categoria Desembolso'].unique()
+    # 📌 Filtrar las categorías de desembolso según el país seleccionado
+    categorias_disponibles = df[df['Pais'] == pais_seleccionado]['Categoria Desembolso'].unique()
 
     if len(categorias_disponibles) == 0:
-        st.warning(f"⚠ No hay categorías de desembolso disponibles para el sector {sector_seleccionado}.")
+        st.warning(f"⚠ No hay categorías de desembolso disponibles para {pais_seleccionado}.")
         return
 
     categoria_seleccionada = st.selectbox("📊 Selecciona una categoría de desembolso:", sorted(categorias_disponibles))
 
-    # 📌 Filtrar datos por sector y categoría de desembolso
-    df_filtro = df[(df['Sector'] == sector_seleccionado) & (df['Categoria Desembolso'] == categoria_seleccionada)]
+    # 📌 Filtrar datos por país y categoría de desembolso
+    df_filtro = df[(df['Pais'] == pais_seleccionado) & (df['Categoria Desembolso'] == categoria_seleccionada)]
 
     if df_filtro.empty:
-        st.warning(f"⚠ No hay datos disponibles para {sector_seleccionado} - {categoria_seleccionada}.")
+        st.warning(f"⚠ No hay datos disponibles para {pais_seleccionado} - {categoria_seleccionada}.")
         return
 
     # 📌 Ejecutar la regresión y graficar resultados
-    realizar_regresion(df_filtro, sector_seleccionado, categoria_seleccionada)
+    realizar_regresion(df_filtro, pais_seleccionado, categoria_seleccionada)
 
 # 📌 Ejecutar la app si se llama directamente
 if __name__ == "__main__":
     app()
+
+
