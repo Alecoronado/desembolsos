@@ -7,3 +7,5 @@ openpyxl
 matplotlib
 scikit-learn
 tensorflow
+altair
+openpyxl
