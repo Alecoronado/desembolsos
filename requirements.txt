@@ -1,5 +1,5 @@
 altair
-numpy=
+numpy
 pandas
 pydeck
 streamlit

@@ -74,7 +74,7 @@ def predecir_curva(nuevos_proyectos):
     predicciones = np.clip(predicciones, 0, 1)
     predicciones = np.maximum.accumulate(predicciones, axis=1)
     
-    mask = predicciones >= 0.93
+    mask = predicciones >= 0.94
     for i in range(predicciones.shape[0]):
         indices = np.where(mask[i])[0]
         if len(indices) > 1:
