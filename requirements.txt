@@ -1,0 +1,9 @@
+altair
+numpy
+pandas
+pydeck
+streamlit
+openpyxl
+matplotlib
+scikit-learn
+tensorflow
