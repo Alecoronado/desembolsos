@@ -1,8 +1,8 @@
-altair
+altair<6
 numpy
 pandas
 pydeck
-streamlit
+streamlit>=1.32.0
 openpyxl
 matplotlib
 scikit-learn
