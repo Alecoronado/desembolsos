@@ -6,7 +6,7 @@ from sklearn.metrics import r2_score
 
 # 📌 Cargar los datos desde el archivo Excel
 def cargar_datos():
-    file_path = "Desembolsos_Acum_Max.xlsx"  # Asegúrate de que el archivo esté en la misma carpeta
+    file_path = "Desembolsos_Acum_Max.xlsx"  
     try:
         df = pd.read_excel(file_path, sheet_name='Sheet1')
         df = df[['Pais', 'Categoria Desembolso', 'Años', 'Porcentaje Acumulado']].dropna()
