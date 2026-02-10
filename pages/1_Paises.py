@@ -32,8 +32,8 @@ def realizar_regresion(df_filtro, pais_seleccionado, categoria_seleccionada):
     y_pred_lineal = modelo_lineal.predict(X)
     r2_lineal = r2_score(y, y_pred_lineal)
 
-    # 📌 Aplicar regresión polinómica (grado 2)
-    poly_features = PolynomialFeatures(degree=2)
+    # 📌 Aplicar regresión polinómica (grado 3)
+    poly_features = PolynomialFeatures(degree=3)
     X_poly = poly_features.fit_transform(X)
     modelo_poly = LinearRegression()
     modelo_poly.fit(X_poly, y)
@@ -43,9 +43,9 @@ def realizar_regresion(df_filtro, pais_seleccionado, categoria_seleccionada):
     # 📌 Mostrar los coeficientes R² en columnas
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("� R² Regresión Lineal", f"{r2_lineal:.4f}")
+        st.metric("📊 R² Regresión Lineal", f"{r2_lineal:.4f}")
     with col2:
-        st.metric("📈 R² Regresión Polinómica (grado 2)", f"{r2_poly:.4f}")
+        st.metric("📈 R² Regresión Polinómica (grado 3)", f"{r2_poly:.4f}")
 
     # 📌 Crear puntos suaves para la curva polinómica
     X_smooth = np.linspace(X.min(), X.max(), 300).reshape(-1, 1)
