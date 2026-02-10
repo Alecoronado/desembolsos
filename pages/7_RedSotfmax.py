@@ -13,19 +13,18 @@ from datetime import datetime, timedelta
 # -----------------------------
 FILE_PATH = "Desembolsos_Softmax.xlsx"
 SHEET_NAME = "Sheet1"
-YEAR_PREFIX = "Año"
+YEAR_PREFIX = "p_Año"  # columnas tipo "p_Año0", "p_Año1", ...
 
 FEATURE_COLS = [
     "Pais",
     "Sector",
     "SubSector",
     "TipodePrestamo",
-    "Categoria Desembolso",
-    "Monto_Total_Prestamo_Millones",
 ]
 
-CAT_COLS = ["Pais", "Sector", "SubSector", "TipodePrestamo", "Categoria Desembolso"]
-NUM_COLS = ["Monto_Total_Prestamo_Millones"]
+CAT_COLS = ["Pais", "Sector", "SubSector", "TipodePrestamo"]
+NUM_COLS = []  # No hay columnas numéricas en este dataset
+
 
 # -----------------------------
 # Helpers
@@ -72,14 +71,16 @@ def prepare_XY(df: pd.DataFrame):
         raise ValueError(f"No se encontraron columnas objetivo con prefijo '{YEAR_PREFIX}'.")
 
     X = df[FEATURE_COLS].copy()
-    Y_cum = df[Y_cols].copy()
+    Y_inc = df[Y_cols].copy()
+    
+    # Las columnas ya son incrementos (p_Año), solo normalizamos
+    row_sum = Y_inc.sum(axis=1).replace(0, np.nan)
+    Y_inc = Y_inc.div(row_sum, axis=0).fillna(0)
 
-    Y_inc = build_increment_targets_from_cum(Y_cum)
-
-    p_cols = [f"p_{c}" for c in Y_inc.columns]
-    Y_inc.columns = p_cols
-
-    return X, Y_inc, Y_cum.columns.tolist(), p_cols
+    # Crear nombres de columnas acumuladas para visualización
+    year_cols = [c.replace("p_", "") for c in Y_cols]
+    
+    return X, Y_inc, year_cols, Y_cols
 
 def plot_curve_from_cum(C: np.ndarray, year_cols, start_date, title):
     dates = [start_date + timedelta(days=365 * i) for i in range(len(year_cols))]
@@ -107,8 +108,7 @@ def load_and_train_model():
     unique_values = {
         "Pais": sorted(df["Pais"].dropna().unique()),
         "Sector": sorted(df["Sector"].dropna().unique()),
-        "TipodePrestamo": sorted(df["TipodePrestamo"].dropna().unique()),
-        "Categoria Desembolso": sorted(df["Categoria Desembolso"].dropna().unique())
+        "TipodePrestamo": sorted(df["TipodePrestamo"].dropna().unique())
     }
     sector_subsector_map = (
         df.groupby("Sector")["SubSector"]
@@ -120,11 +120,9 @@ def load_and_train_model():
     encoder = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
     X_cat = encoder.fit_transform(X[CAT_COLS])
 
-    X_num_raw = np.log1p(X[NUM_COLS].astype(float))
-    scaler = StandardScaler()
-    X_num = scaler.fit_transform(X_num_raw)
-
-    X_proc = np.hstack([X_cat, X_num]).astype(np.float32)
+    # No hay columnas numéricas en este dataset
+    scaler = None
+    X_proc = X_cat.astype(np.float32)
     Y_np = Y_inc.values.astype(np.float32)
 
     X_train, X_test, y_train, y_test = train_test_split(
@@ -169,10 +167,7 @@ model, encoder, scaler, year_cols, p_cols, unique_values, sector_subsector_map =
 # -----------------------------
 def predict_distribution_and_cum(new_df: pd.DataFrame):
     X_cat = encoder.transform(new_df[CAT_COLS])
-    X_num_raw = np.log1p(new_df[NUM_COLS].astype(float))
-    X_num = scaler.transform(X_num_raw)
-
-    X_proc = np.hstack([X_cat, X_num]).astype(np.float32)
+    X_proc = X_cat.astype(np.float32)
 
     p_pred = model.predict(X_proc, verbose=0)
     p_pred = np.clip(p_pred, 0, 1)
@@ -200,13 +195,11 @@ col1, col2 = st.columns(2)
 with col1:
     pais = st.selectbox("🌍 País:", options=unique_values["Pais"])
     sector = st.selectbox("🏭 Sector:", options=unique_values["Sector"])
-    subsectores = sector_subsector_map.get(sector, [])
-    subsector = st.selectbox("🏢 SubSector:", options=subsectores)
 
 with col2:
+    subsectores = sector_subsector_map.get(sector, [])
+    subsector = st.selectbox("🏢 SubSector:", options=subsectores)
     tipodeprestamo = st.selectbox("💰 Tipo de Préstamo:", options=unique_values["TipodePrestamo"])
-    categoria = st.selectbox("📊 Categoría de Desembolso:", options=unique_values["Categoria Desembolso"])
-    monto = st.number_input("💵 Monto Total del Préstamo (Millones)", value=40.0, min_value=0.0)
 
 if st.button("Predecir Curva"):
     new_df = pd.DataFrame({
@@ -214,8 +207,6 @@ if st.button("Predecir Curva"):
         "Sector": [sector],
         "SubSector": [subsector],
         "TipodePrestamo": [tipodeprestamo],
-        "Categoria Desembolso": [categoria],
-        "Monto_Total_Prestamo_Millones": [monto],
     })
 
     df_p, df_C = predict_distribution_and_cum(new_df)
