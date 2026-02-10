@@ -27,10 +27,12 @@ FEATURE_COLS = [
 CAT_COLS = ["Pais", "Sector", "SubSector", "TipodePrestamo", "Categoria Desembolso"]
 NUM_COLS = ["Monto Prestamo"]
 
+
 # -----------------------------
 # Helpers
 # -----------------------------
 def prepare_XY(df: pd.DataFrame):
+    # Validaciones
     missing = [c for c in FEATURE_COLS if c not in df.columns]
     if missing:
         raise ValueError(f"Faltan columnas X: {missing}")
@@ -39,6 +41,7 @@ def prepare_XY(df: pd.DataFrame):
     if not p_cols:
         raise ValueError(f"No se encontraron columnas objetivo con prefijo '{YEAR_PREFIX}'.")
 
+    # Ordenar p_cols por número de año
     def year_key(col):
         import re
         m = re.findall(r"\d+", str(col))
@@ -49,13 +52,17 @@ def prepare_XY(df: pd.DataFrame):
     X = df[FEATURE_COLS].copy()
     Y_inc = df[p_cols].copy().astype(float)
 
+    # Normalizar Y por fila para asegurar suma=1
     row_sum = Y_inc.sum(axis=1).replace(0, np.nan)
     Y_inc = Y_inc.div(row_sum, axis=0).fillna(0)
 
+    # Columnas "Año0..AñoN" solo para mostrar acumulado
     year_cols = [c.replace("p_", "") for c in p_cols]
+
     return X, Y_inc, year_cols, p_cols
 
 def compute_t95_from_p(P: np.ndarray) -> np.ndarray:
+    """t95 = primer año donde el acumulado llega a 0.95"""
     C = np.cumsum(P, axis=1)
     return (C >= 0.95).argmax(axis=1)
 
@@ -72,54 +79,6 @@ def plot_curve_from_cum(C: np.ndarray, year_cols, start_date, title):
     plt.xlabel("Fecha")
     plt.ylabel("Porcentaje acumulado")
     return plt
-
-def apply_temperature(p_pred: np.ndarray, tau: float) -> np.ndarray:
-    """Ajuste de temperatura sobre probabilidades (aprox. softmax(z/tau))"""
-    p = np.clip(p_pred, 1e-12, 1.0)
-    p = np.power(p, 1.0 / tau)
-    p = p / p.sum(axis=1, keepdims=True)
-    return p
-
-def cum_from_p(p: np.ndarray) -> np.ndarray:
-    C = np.cumsum(p, axis=1)
-    C[:, -1] = 1.0
-    return C
-
-def tune_tau_by_category(model, X_proc_full, df_full, p_cols, categoria_col="Categoria Desembolso"):
-    """
-    Encuentra el mejor tau por categoría minimizando MAE del acumulado (C)
-    entre curva real y curva predicha ajustada con tau.
-    """
-    P_true = df_full[p_cols].values.astype(np.float32)
-    P_true = P_true / np.maximum(P_true.sum(axis=1, keepdims=True), 1e-12)
-    C_true = cum_from_p(P_true)
-
-    P_pred = model.predict(X_proc_full, verbose=0).astype(np.float32)
-
-    taus = np.round(np.arange(0.60, 1.41, 0.05), 2)
-    tau_map = {}
-
-    for cat in sorted(df_full[categoria_col].dropna().unique()):
-        idx = (df_full[categoria_col].values == cat)
-        n = int(idx.sum())
-
-        if n < 3:
-            tau_map[cat] = {"tau": 1.0, "n": n, "mae": None}
-            continue
-
-        best_tau, best_score = 1.0, 1e18
-        for tau in taus:
-            P_adj = apply_temperature(P_pred[idx], float(tau))
-            C_adj = cum_from_p(P_adj)
-            score = float(np.mean(np.abs(C_true[idx] - C_adj)))
-
-            if score < best_score:
-                best_score = score
-                best_tau = float(tau)
-
-        tau_map[cat] = {"tau": best_tau, "n": n, "mae": float(best_score)}
-
-    return tau_map
 
 # -----------------------------
 # Train with cache
@@ -147,6 +106,7 @@ def load_and_train_model():
     encoder = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
     X_cat = encoder.fit_transform(X[CAT_COLS])
 
+    # Recomendado: log1p para monto
     X_num_raw = np.log1p(X[NUM_COLS].astype(float))
     scaler = StandardScaler()
     X_num = scaler.fit_transform(X_num_raw)
@@ -156,6 +116,7 @@ def load_and_train_model():
 
     # --- Balanceo por velocidad (t95) ---
     t95 = compute_t95_from_p(Y_np)
+    # Clases: rápido (0-1), intermedio (2-4), lento (>=5)
     speed_class = np.where(t95 <= 1, 0, np.where(t95 <= 4, 1, 2))
 
     counts = np.bincount(speed_class, minlength=3).astype(float)
@@ -195,31 +156,16 @@ def load_and_train_model():
         verbose=0
     )
 
-    # --- Calibrar tau por categoría (con TODO el dataset) ---
-    df_full = pd.concat([X.reset_index(drop=True), Y_inc.reset_index(drop=True)], axis=1)
+    return model, encoder, scaler, year_cols, p_cols, unique_values, sector_subsector_map
 
-    X_cat_full = encoder.transform(X[CAT_COLS])
-    X_num_raw_full = np.log1p(X[NUM_COLS].astype(float))
-    X_num_full = scaler.transform(X_num_raw_full)
-    X_proc_full = np.hstack([X_cat_full, X_num_full]).astype(np.float32)
-
-    tau_map = tune_tau_by_category(
-        model=model,
-        X_proc_full=X_proc_full,
-        df_full=df_full,
-        p_cols=p_cols,
-        categoria_col="Categoria Desembolso"
-    )
-
-    return model, encoder, scaler, year_cols, p_cols, unique_values, sector_subsector_map, tau_map
-
-model, encoder, scaler, year_cols, p_cols, unique_values, sector_subsector_map, tau_map = load_and_train_model()
+model, encoder, scaler, year_cols, p_cols, unique_values, sector_subsector_map = load_and_train_model()
 
 # -----------------------------
 # Predict
 # -----------------------------
 def predict_distribution_and_cum(new_df: pd.DataFrame, tau: float = 1.0):
     X_cat = encoder.transform(new_df[CAT_COLS])
+
     X_num_raw = np.log1p(new_df[NUM_COLS].astype(float))
     X_num = scaler.transform(X_num_raw)
 
@@ -227,8 +173,10 @@ def predict_distribution_and_cum(new_df: pd.DataFrame, tau: float = 1.0):
 
     p_pred = model.predict(X_proc, verbose=0)
 
+    # (Opcional) Temperatura para controlar concentración
     if tau != 1.0:
-        p_pred = apply_temperature(p_pred, tau)
+        p_pred = np.power(np.clip(p_pred, 1e-12, 1.0), 1.0 / tau)
+        p_pred = p_pred / p_pred.sum(axis=1, keepdims=True)
 
     p_pred = np.clip(p_pred, 0, 1)
 
@@ -237,13 +185,14 @@ def predict_distribution_and_cum(new_df: pd.DataFrame, tau: float = 1.0):
 
     df_p = pd.DataFrame(p_pred, columns=p_cols)
     df_C = pd.DataFrame(C_pred, columns=year_cols)
+
     return df_p, df_C
 
 # -----------------------------
 # App UI
 # -----------------------------
-st.title("📊 Predicción de Curvas de Desembolso (τ automático por categoría)")
-st.write("El modelo predice **incrementos (p)** con softmax y construye el acumulado con cumsum (cierra en 1).")
+st.title("📊 Predicción de Curvas de Desembolso (Softmax → siempre llega a 1)")
+st.write("El modelo predice el **desembolso anual** (incrementos) y luego construye el acumulado con cumsum.")
 
 nombre_proyecto = st.text_input("🏗️ Nombre del Proyecto:")
 fecha_inicio = st.date_input("📅 Fecha de Inicio del Proyecto:", datetime.today())
@@ -261,10 +210,8 @@ with col2:
     categoria = st.selectbox("📊 Categoría de Desembolso:", options=unique_values["Categoria Desembolso"])
     monto = st.number_input("💵 Monto del Préstamo (Millones)", value=40.0, min_value=0.0)
 
-# Mostrar tau recomendado para la categoría seleccionada
-tau_auto = tau_map.get(categoria, {}).get("tau", 1.0)
-n_cat = tau_map.get(categoria, {}).get("n", 0)
-st.caption(f"τ automático para '{categoria}': **{tau_auto:.2f}** (n={n_cat})")
+tau = st.slider("Concentración (temperatura)", 0.5, 1.5, 1.0, 0.05)
+st.caption("Baja tau (<1) = curva más concentrada; sube tau (>1) = más repartida.")
 
 if st.button("Predecir Curva"):
     new_df = pd.DataFrame({
@@ -276,7 +223,7 @@ if st.button("Predecir Curva"):
         "Monto Prestamo": [monto],
     })
 
-    df_p, df_C = predict_distribution_and_cum(new_df, tau=tau_auto)
+    df_p, df_C = predict_distribution_and_cum(new_df, tau=tau)
 
     st.subheader("🧾 Desembolso anual predicho (incrementos, suma=1)")
     st.dataframe(df_p.style.format("{:.4f}"))
@@ -292,3 +239,4 @@ if st.button("Predecir Curva"):
         title=f"Curva de Desembolso - {nombre_proyecto or 'Nuevo Proyecto'}"
     )
     st.pyplot(plt_obj.gcf())
+
