@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
 from sklearn.metrics import r2_score
 
 # 📌 Cargar los datos desde el archivo Excel
@@ -25,25 +27,45 @@ def realizar_regresion(df_filtro, pais_seleccionado, categoria_seleccionada):
         return
 
     # 📌 Aplicar regresión lineal
-    modelo = LinearRegression()
-    modelo.fit(X, y)
-    y_pred = modelo.predict(X)
-    r2 = r2_score(y, y_pred)
+    modelo_lineal = LinearRegression()
+    modelo_lineal.fit(X, y)
+    y_pred_lineal = modelo_lineal.predict(X)
+    r2_lineal = r2_score(y, y_pred_lineal)
 
-    # 📌 Mostrar el coeficiente R²
-    st.write(f"### 📌 Coeficiente de determinación R²: `{r2:.2f}`")
+    # 📌 Aplicar regresión polinómica (grado 2)
+    poly_features = PolynomialFeatures(degree=2)
+    X_poly = poly_features.fit_transform(X)
+    modelo_poly = LinearRegression()
+    modelo_poly.fit(X_poly, y)
+    y_pred_poly = modelo_poly.predict(X_poly)
+    r2_poly = r2_score(y, y_pred_poly)
+
+    # 📌 Mostrar los coeficientes R² en columnas
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("� R² Regresión Lineal", f"{r2_lineal:.4f}")
+    with col2:
+        st.metric("📈 R² Regresión Polinómica (grado 2)", f"{r2_poly:.4f}")
+
+    # 📌 Crear puntos suaves para la curva polinómica
+    X_smooth = np.linspace(X.min(), X.max(), 300).reshape(-1, 1)
+    X_smooth_poly = poly_features.transform(X_smooth)
+    y_smooth_poly = modelo_poly.predict(X_smooth_poly)
 
     # 📌 Crear gráfico en Matplotlib
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.scatter(X, y, color='blue', label="Datos Reales")
-    ax.plot(X, y_pred, color='red', linestyle="--", label="Regresión Lineal")
-    ax.set_xlabel("Años")
-    ax.set_ylabel("Porcentaje Acumulado")
-    ax.set_title(f"Regresión Lineal para {pais_seleccionado} - {categoria_seleccionada}")
-    ax.legend()
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.scatter(X, y, color='blue', s=100, alpha=0.6, label="Datos Reales", zorder=3)
+    ax.plot(X, y_pred_lineal, color='red', linestyle="--", linewidth=2, label=f"Regresión Lineal (R²={r2_lineal:.4f})", zorder=2)
+    ax.plot(X_smooth, y_smooth_poly, color='green', linewidth=2, label=f"Regresión Polinómica (R²={r2_poly:.4f})", zorder=2)
+    ax.set_xlabel("Años", fontsize=12)
+    ax.set_ylabel("Porcentaje Acumulado", fontsize=12)
+    ax.set_title(f"Análisis de Regresión para {pais_seleccionado} - {categoria_seleccionada}", fontsize=14, fontweight='bold')
+    ax.legend(loc='best', fontsize=10)
+    ax.grid(True, alpha=0.3)
     
     # 📌 Mostrar gráfico
     st.pyplot(fig)
+
 
 # 📌 Función principal de la página
 def app():
