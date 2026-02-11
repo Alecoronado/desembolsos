@@ -63,8 +63,7 @@ def get_monthly_data(data, year):
 
     # Agrupar los datos por mes y sumar los montos
     grouped_data = data_year.groupby('Month').agg({'Ejecutados': 'sum',
-                                                   'Proyectados': 'sum',
-                                                   'ProyeccionesIniciales': 'sum'}).reset_index()
+                                                   'Proyectados': 'sum'}).reset_index()
 
     # Reemplazar el número del mes con el nombre del mes en español
     spanish_months = [calendar.month_name[i].capitalize() for i in range(1, 13)]
@@ -79,9 +78,9 @@ def get_monthly_data(data, year):
     return transposed_data
 
 def create_line_chart_with_labels(data):
-    # Filtrar solo las primeras 3 filas para el gráfico
-    if data.shape[0] > 3:
-        data = data.iloc[:3, :]
+    # Filtrar solo las primeras 2 filas para el gráfico
+    if data.shape[0] > 2:
+        data = data.iloc[:2, :]
 
     # Eliminar la columna 'Totales' si está presente
     if 'Totales' in data.columns:
@@ -95,8 +94,8 @@ def create_line_chart_with_labels(data):
                       "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
     # Definir los colores para cada línea
-    color_scale = alt.Scale(domain=['Ejecutados', 'Proyectados', 'ProyeccionesIniciales'],
-                            range=['red', 'blue', 'skyblue'])
+    color_scale = alt.Scale(domain=['Ejecutados', 'Proyectados'],
+                            range=['red', 'blue'])
 
     # Crear el gráfico de líneas
     line = alt.Chart(long_df).mark_line(point=True).encode(
@@ -125,9 +124,9 @@ def create_line_chart_with_labels(data):
     return chart
 
 def calculate_cumulative_sum(data):
-    # Asegurarse de trabajar solo con las tres filas originales en caso de que haya más filas
-    if data.shape[0] > 3:
-        data = data.iloc[:3, :]
+    # Asegurarse de trabajar solo con las dos filas originales en caso de que haya más filas
+    if data.shape[0] > 2:
+        data = data.iloc[:2, :]
 
     # Calcula la suma acumulada a lo largo de los meses para cada una de las filas
     # Asegúrate de no incluir la columna de Totales en el cálculo
@@ -143,9 +142,9 @@ def create_cumulative_line_chart(data):
     # Convertir los valores a millones y redondear a enteros
     data_in_millions = data.apply(lambda x: (x / 1).round())
 
-    # Filtrar solo las primeras 3 filas para el gráfico
-    if data_in_millions.shape[0] > 3:
-        data_in_millions = data_in_millions.iloc[:3, :]
+    # Filtrar solo las primeras 2 filas para el gráfico
+    if data_in_millions.shape[0] > 2:
+        data_in_millions = data_in_millions.iloc[:2, :]
 
     # Eliminar la columna 'Totales' si está presente
     if 'Totales' in data_in_millions.columns:
@@ -159,8 +158,8 @@ def create_cumulative_line_chart(data):
                       "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
     # Definir los colores para cada línea
-    color_scale = alt.Scale(domain=['Ejecutados', 'Proyectados', 'ProyeccionesIniciales'],
-                            range=['red', 'blue', 'skyblue'])
+    color_scale = alt.Scale(domain=['Ejecutados', 'Proyectados'],
+                            range=['red', 'blue'])
 
     # Crear el gráfico de líneas
     line = alt.Chart(long_df).mark_line(point=True).encode(
@@ -197,7 +196,7 @@ def create_comparison_bar_chart(filtered_data, year):
     # Agrupar los datos por 'Pais' y calcular la suma de 'Ejecutados' y 'Proyectados', redondeando a un decimal
     grouped_data = data_year.groupby('Pais', as_index=False).agg({
         'Ejecutados': lambda x: round(x.sum(), 2),
-        'ProyeccionesIniciales': lambda x: round(x.sum(), 2)
+        'Proyectados': lambda x: round(x.sum(), 2)
     })
 
     # Configurar las posiciones y ancho de las barras
@@ -211,7 +210,7 @@ def create_comparison_bar_chart(filtered_data, year):
     bars1 = ax.bar(index - bar_width/2, grouped_data['Ejecutados'], bar_width, label='Ejecutados', color='r')
 
     # Crear las barras para 'Proyectados'
-    bars2 = ax.bar(index + bar_width/2, grouped_data['ProyeccionesIniciales'], bar_width, label='ProyeccionesIniciales', color='skyblue')
+    bars2 = ax.bar(index + bar_width/2, grouped_data['Proyectados'], bar_width, label='Proyectados', color='blue')
 
     # Añadir las etiquetas de los datos en las barras
     ax.bar_label(bars1, padding=3, fontsize=8, fmt='%.2f')  # Reducir el tamaño de la fuente aquí
@@ -220,7 +219,7 @@ def create_comparison_bar_chart(filtered_data, year):
     # Ajustar las etiquetas y títulos
     ax.set_xlabel('País')
     ax.set_ylabel('Monto (en millones)')
-    ax.set_title('Ejecutados y ProyeccionesIniciales por País')
+    ax.set_title('Ejecutados y Proyectados por País')
     ax.set_xticks(index)
     ax.set_xticklabels(grouped_data['Pais'], rotation=45, fontsize=8)  # Reducir el tamaño de la fuente aquí
     ax.set_yticklabels(ax.get_yticks(), fontsize=8)  # Reducir el tamaño de la fuente aquí
@@ -236,12 +235,12 @@ def create_comparison_bar_chart(filtered_data, year):
 
 def create_responsible_comparison_chart(filtered_data, year):
     # Filtrar los datos para el año seleccionado y que tengan valores
-    data_year = filtered_data[(filtered_data['Year'] == year) & ((filtered_data['Ejecutados'] > 0) | (filtered_data['ProyeccionesIniciales'] > 0))]
+    data_year = filtered_data[(filtered_data['Year'] == year) & ((filtered_data['Ejecutados'] > 0) | (filtered_data['Proyectados'] > 0))]
 
     # Agrupar los datos por 'Responsable'
     grouped_data = data_year.groupby('Responsable', as_index=False).agg({
         'Ejecutados': lambda x: round(x.sum(), 1),
-        'ProyeccionesIniciales': lambda x: round(x.sum(), 1)
+        'Proyectados': lambda x: round(x.sum(), 1)
     })
 
     # Configurar las posiciones y ancho de las barras
@@ -256,7 +255,7 @@ def create_responsible_comparison_chart(filtered_data, year):
     bars1 = ax.bar(index - bar_width/2, grouped_data['Ejecutados'], bar_width, label='Ejecutados', color='r')
 
     # Crear las barras para 'Proyectados'
-    bars2 = ax.bar(index + bar_width/2, grouped_data['ProyeccionesIniciales'], bar_width, label='ProyeccionesIniciales', color='skyblue')
+    bars2 = ax.bar(index + bar_width/2, grouped_data['Proyectados'], bar_width, label='Proyectados', color='blue')
 
     # Añadir las etiquetas en las barras
     for bars in [bars1, bars2]:
@@ -267,7 +266,7 @@ def create_responsible_comparison_chart(filtered_data, year):
     # Añadir las etiquetas y títulos
     ax.set_xlabel('Responsable')
     ax.set_ylabel('Monto')
-    ax.set_title('Ejecutados vs ProyeccionesIniciales por Responsable')
+    ax.set_title('Ejecutados vs Proyectados por Responsable')
     
     # Ajustar las etiquetas del eje x para alinear con las barras
     ax.set_xticks(index)
