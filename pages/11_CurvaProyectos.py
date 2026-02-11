@@ -2,78 +2,75 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 import numpy as np
-import threading
 import io
 from datetime import datetime
 
 # Configuración inicial
-_lock = threading.Lock()
-
-# URLs de las hojas de Google Sheets
-sheet_url_proyectos = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSHedheaRLyqnjwtsRvlBFFOnzhfarkFMoJ04chQbKZCBRZXh_2REE3cmsRC69GwsUK0PoOVv95xptX/pub?gid=2084477941&single=true&output=csv"
-sheet_url_operaciones = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTadFwCrS_aws658IA94yjGvX_u5oaLnZ8JTVfTZqpaLhI1szZEUbst3rR1rC-zfReRNpMFt93RK_YV/pub?gid=420865954&single=true&output=csv"
-sheet_url_desembolsos = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTadFwCrS_aws658IA94yjGvX_u5oaLnZ8JTVfTZqpaLhI1szZEUbst3rR1rC-zfReRNpMFt93RK_YV/pub?gid=0&single=true&output=csv"
-
-# Inicializar la aplicación de Streamlit
 st.title("Análisis de Desembolsos por Proyecto")
 
-def load_data(url):
-    with _lock:
-        return pd.read_csv(url)
+def load_data():
+    """Cargar datos desde Excel local"""
+    file_path = "Cartera_Desembolsos.xlsx"
+    df = pd.read_excel(file_path)
+    return df
 
-def convert_to_float(monto_str):
-    try:
-        monto_str = str(monto_str).replace('.', '').replace(',', '.')
-        return float(monto_str)
-    except ValueError:
-        return np.nan
-
-def process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos):
-    df_proyectos = df_proyectos[['NoProyecto', 'IDAreaPrioritaria', 'IDAreaIntervencion']]
-    df_operaciones = df_operaciones[['NoProyecto', 'NoOperacion', 'IDEtapa', 'Alias', 'Pais', 'FechaVigencia', 'Estado', 'AporteFONPLATAVigente']]
-    df_operaciones_desembolsos = df_operaciones_desembolsos[['IDDesembolso','IDOperacion', 'NoOperacion', 'Monto', 'FechaEfectiva']]
+def process_data(df):
+    """Procesar datos para análisis de curva de desembolsos"""
     
-    df_operaciones_desembolsos['Monto'] = df_operaciones_desembolsos['Monto'].apply(convert_to_float)
-    df_operaciones_desembolsos = df_operaciones_desembolsos.iloc[:, 1:].drop_duplicates()
+    # Convertir fechas
+    df['FechaEfectiva'] = pd.to_datetime(df['FechaEfectiva'], format='%d/%m/%Y', errors='coerce')
+    df['FechaVigencia'] = pd.to_datetime(df['FechaVigencia'], format='%d/%m/%Y', errors='coerce')
     
-    merged_df = pd.merge(df_operaciones_desembolsos, df_operaciones, left_on='IDOperacion', right_on='IDEtapa', how='left')
-    merged_df = pd.merge(merged_df, df_proyectos, on='NoProyecto', how='left')
+    # Convertir montos a numérico
+    df['Monto'] = pd.to_numeric(df['Monto'], errors='coerce')
+    df['AporteFONPLATAVigente'] = pd.to_numeric(df['AporteFONPLATAVigente'], errors='coerce')
     
-    merged_df['FechaEfectiva'] = pd.to_datetime(merged_df['FechaEfectiva'], dayfirst=True, errors='coerce')
-    merged_df['FechaVigencia'] = pd.to_datetime(merged_df['FechaVigencia'], dayfirst=True, errors='coerce')
-    merged_df['Ano'] = ((merged_df['FechaEfectiva'] - merged_df['FechaVigencia']).dt.days / 365).fillna(-1)
-    merged_df['Ano_FechaEfectiva'] = pd.to_datetime(merged_df['FechaEfectiva']).dt.year
+    # Calcular año relativo desde la fecha de vigencia
+    df['Ano'] = ((df['FechaEfectiva'] - df['FechaVigencia']).dt.days / 365).fillna(-1)
     
-    merged_df['Monto'] = pd.to_numeric(merged_df['Monto'], errors='coerce')
-    merged_df['AporteFONPLATAVigente'] = pd.to_numeric(merged_df['AporteFONPLATAVigente'], errors='coerce')
-    merged_df['Porcentaje'] = ((merged_df['Monto'] / merged_df['AporteFONPLATAVigente']) * 100).round(2)
-    filtered_df = merged_df[merged_df['Ano'] >= 0]
+    # Calcular año de fecha efectiva
+    df['Ano_FechaEfectiva'] = df['FechaEfectiva'].dt.year
+    
+    # Calcular porcentaje del monto respecto al aporte total
+    df['Porcentaje'] = ((df['Monto'] / df['AporteFONPLATAVigente']) * 100).round(2)
+    
+    # Filtrar solo registros con Ano >= 0 (desembolsos después de la vigencia)
+    filtered_df = df[df['Ano'] >= 0].copy()
     filtered_df['Ano'] = filtered_df['Ano'].astype(int)
     
-    etapa_to_alias = df_operaciones.set_index('IDEtapa')['Alias'].to_dict()
-    filtered_df['IDEtapa'] = filtered_df['IDEtapa'].astype(str)
-    filtered_df['IDEtapa_Alias'] = filtered_df['IDEtapa'].map(lambda x: f"{x} ({etapa_to_alias.get(x, '')})")
+    # Crear IDOperacion_Alias para el selectbox
+    filtered_df['IDOperacion'] = filtered_df['IDOperacion'].astype(str)
+    filtered_df['IDOperacion_Alias'] = filtered_df.apply(
+        lambda x: f"{x['IDOperacion']} ({x['Alias']})" if pd.notna(x['Alias']) else x['IDOperacion'], 
+        axis=1
+    )
     
-    unique_etapas_alias = sorted(filtered_df['IDEtapa_Alias'].unique())
-    selected_etapa_alias = st.selectbox('Select IDEtapa to filter', unique_etapas_alias)
+    # Selectbox para filtrar por proyecto
+    unique_operaciones_alias = sorted(filtered_df['IDOperacion_Alias'].unique())
+    selected_operacion_alias = st.selectbox('Selecciona Proyecto (IDOperacion)', unique_operaciones_alias)
     
-    if selected_etapa_alias:
-        selected_etapa = selected_etapa_alias.split(' ')[0]
-        filtered_result_df = filtered_df[filtered_df['IDEtapa'] == selected_etapa]
+    if selected_operacion_alias:
+        selected_operacion = selected_operacion_alias.split(' ')[0]
+        filtered_result_df = filtered_df[filtered_df['IDOperacion'] == selected_operacion]
     else:
         filtered_result_df = filtered_df
-
-    result_df = filtered_result_df.groupby(['IDEtapa', 'Ano'])[['Monto', 'Porcentaje']].sum().reset_index()
-    result_df['Monto Acumulado'] = result_df.groupby('IDEtapa')['Monto'].cumsum().round(2).reset_index(drop=True)
-    result_df['Porcentaje Acumulado'] = result_df.groupby('IDEtapa')['Porcentaje'].cumsum().round(2).reset_index(drop=True)
-
-    result_df_ano_efectiva = filtered_result_df.groupby(['IDEtapa', 'Ano_FechaEfectiva'])[['Monto', 'Porcentaje']].sum().reset_index()
-    result_df_ano_efectiva['Monto Acumulado'] = result_df_ano_efectiva.groupby('IDEtapa')['Monto'].cumsum().round(2).reset_index(drop=True)
-    result_df_ano_efectiva['Porcentaje Acumulado'] = result_df_ano_efectiva.groupby('IDEtapa')['Porcentaje'].cumsum().round(2).reset_index(drop=True)
-
+    
+    # Agrupar por año relativo
+    result_df = filtered_result_df.groupby(['IDOperacion', 'Ano'])[['Monto', 'Porcentaje']].sum().reset_index()
+    result_df['Monto'] = (result_df['Monto'] / 1000000).round(2)  # Convertir a millones
+    result_df['Monto Acumulado'] = result_df.groupby('IDOperacion')['Monto'].cumsum().round(2)
+    result_df['Porcentaje Acumulado'] = result_df.groupby('IDOperacion')['Porcentaje'].cumsum().round(2)
+    
+    # Agrupar por año de fecha efectiva
+    result_df_ano_efectiva = filtered_result_df.groupby(['IDOperacion', 'Ano_FechaEfectiva'])[['Monto', 'Porcentaje']].sum().reset_index()
+    result_df_ano_efectiva['Monto'] = (result_df_ano_efectiva['Monto'] / 1000000).round(2)  # Convertir a millones
+    result_df_ano_efectiva['Monto Acumulado'] = result_df_ano_efectiva.groupby('IDOperacion')['Monto'].cumsum().round(2)
+    result_df_ano_efectiva['Porcentaje Acumulado'] = result_df_ano_efectiva.groupby('IDOperacion')['Porcentaje'].cumsum().round(2)
+    
     return result_df, result_df_ano_efectiva
 
 def line_chart(data, x_col, y_col, title, color):
+    """Crear gráfico de líneas"""
     chart = alt.Chart(data).mark_line(point=True, color=color).encode(
         x=alt.X(f'{x_col}:O', axis=alt.Axis(title='Año')),
         y=alt.Y(f'{y_col}:Q', axis=alt.Axis(title=y_col)),
@@ -86,24 +83,31 @@ def line_chart(data, x_col, y_col, title, color):
     return chart
 
 def run():
-    df_proyectos = load_data(sheet_url_proyectos)
-    df_operaciones = load_data(sheet_url_operaciones)
-    df_operaciones_desembolsos = load_data(sheet_url_desembolsos)
+    """Función principal"""
+    # Cargar datos
+    df = load_data()
     
-    result_df, result_df_ano_efectiva = process_data(df_proyectos, df_operaciones, df_operaciones_desembolsos)
+    # Procesar datos
+    result_df, result_df_ano_efectiva = process_data(df)
     
-    st.write("Tabla por Año:", result_df)
+    # Mostrar tabla por año relativo
+    st.write("### Tabla por Año Relativo (desde Fecha de Vigencia):")
+    st.dataframe(result_df)
     
-    # Gráficos para Año
+    # Gráficos para Año Relativo
     st.altair_chart(line_chart(result_df, 'Ano', 'Monto', 'Monto por Año en Millones', 'steelblue'))
     st.altair_chart(line_chart(result_df, 'Ano', 'Monto Acumulado', 'Monto Acumulado por Año en Millones', 'goldenrod'))
     st.altair_chart(line_chart(result_df, 'Ano', 'Porcentaje', 'Porcentaje por Año', 'salmon'))
     st.altair_chart(line_chart(result_df, 'Ano', 'Porcentaje Acumulado', 'Porcentaje Acumulado del Monto por Año', 'green'))
-
-    st.write("Tabla por Año de Fecha Efectiva:", result_df_ano_efectiva)
+    
+    # Mostrar tabla por año de fecha efectiva
+    st.write("### Tabla por Año de Fecha Efectiva:")
+    st.dataframe(result_df_ano_efectiva)
+    
     # Gráficos para Año de Fecha Efectiva
     st.altair_chart(line_chart(result_df_ano_efectiva, 'Ano_FechaEfectiva', 'Monto', 'Monto por Año de Fecha Efectiva', 'steelblue'))
     st.altair_chart(line_chart(result_df_ano_efectiva, 'Ano_FechaEfectiva', 'Monto Acumulado', 'Monto Acumulado por Año de Fecha Efectiva', 'goldenrod'))
 
 if __name__ == "__main__":
     run()
+
