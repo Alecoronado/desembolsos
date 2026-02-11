@@ -37,17 +37,17 @@ def load_data():
     data_proyectados['Proyectados'] = data_proyectados['Monto']
     data_proyecciones_iniciales['ProyeccionesIniciales'] = data_proyecciones_iniciales['Monto']
     
-    # Agrupar datos por las columnas necesarias
-    grouped_ejecutados = data_ejecutados.groupby(['Pais', 'IDOperacion', 'Responsable', 'Year', 'Month', 'Sector', 'Alias']).agg({'Ejecutados': 'sum'}).reset_index()
-    grouped_proyectados = data_proyectados.groupby(['Pais', 'IDOperacion', 'Responsable', 'Year', 'Month', 'Sector', 'Alias']).agg({'Proyectados': 'sum'}).reset_index()
-    grouped_proyecciones_iniciales = data_proyecciones_iniciales.groupby(['Pais', 'IDOperacion', 'Responsable', 'Year', 'Month', 'Sector', 'Alias']).agg({'ProyeccionesIniciales': 'sum'}).reset_index()
+    # Agrupar datos por las columnas necesarias (incluyendo Riesgo)
+    grouped_ejecutados = data_ejecutados.groupby(['Pais', 'IDOperacion', 'Responsable', 'Riesgo', 'Year', 'Month', 'Sector', 'Alias']).agg({'Ejecutados': 'sum'}).reset_index()
+    grouped_proyectados = data_proyectados.groupby(['Pais', 'IDOperacion', 'Responsable', 'Riesgo', 'Year', 'Month', 'Sector', 'Alias']).agg({'Proyectados': 'sum'}).reset_index()
+    grouped_proyecciones_iniciales = data_proyecciones_iniciales.groupby(['Pais', 'IDOperacion', 'Responsable', 'Riesgo', 'Year', 'Month', 'Sector', 'Alias']).agg({'ProyeccionesIniciales': 'sum'}).reset_index()
     
     # Combinar los tres conjuntos de datos
     merged_data = pd.merge(grouped_ejecutados, grouped_proyectados, 
-                          on=['Pais', 'IDOperacion', 'Responsable', 'Year', 'Month', 'Sector', 'Alias'], 
+                          on=['Pais', 'IDOperacion', 'Responsable', 'Riesgo', 'Year', 'Month', 'Sector', 'Alias'], 
                           how='outer')
     merged_data = pd.merge(merged_data, grouped_proyecciones_iniciales, 
-                          on=['Pais', 'IDOperacion', 'Responsable', 'Year', 'Month', 'Sector', 'Alias'], 
+                          on=['Pais', 'IDOperacion', 'Responsable', 'Riesgo', 'Year', 'Month', 'Sector', 'Alias'], 
                           how='outer').fillna(0)
     
     # Conversiones finales y ajustes de escala (convertir a millones)
@@ -303,6 +303,13 @@ def main():
     else:
         # Filtrar por países seleccionados
         filtered_data = data[data['Pais'].isin(selected_countries)]
+
+    # Filtrar por Riesgo
+    selected_risk = st.selectbox("Selecciona Riesgo", ["Ambos", "RS", "RNS"])
+    
+    if selected_risk != "Ambos":
+        # Filtrar por el riesgo seleccionado
+        filtered_data = filtered_data[filtered_data['Riesgo'] == selected_risk]
 
     # Convertir los valores de año a enteros y obtener la lista ordenada
     unique_years_filtered = sorted(filtered_data['Year'].astype(int).unique())
