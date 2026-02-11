@@ -191,7 +191,7 @@ def predict_distribution_and_cum(new_df: pd.DataFrame, tau: float = 1.0):
 # -----------------------------
 # App UI
 # -----------------------------
-st.title("📊 Predicción de Curvas de Desembolso (Softmax → siempre llega a 1)")
+st.title("📊 Predicción de Curvas de Desembolso")
 st.write("El modelo predice el **desembolso anual** (incrementos) y luego construye el acumulado con cumsum.")
 
 nombre_proyecto = st.text_input("🏗️ Nombre del Proyecto:")
